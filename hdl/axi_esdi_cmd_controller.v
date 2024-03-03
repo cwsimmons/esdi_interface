@@ -71,6 +71,8 @@ module axi_esdi_cmd_controller #(
             esdi_transfer_req <= 1;
             esdi_command_data <= 1;
             state <= 0;
+            buffered_data_out_valid <= 0;
+            buffered_data_in_valid <= 0;
 
             write_addr_valid <= 0;
             write_data_valid <= 0;
