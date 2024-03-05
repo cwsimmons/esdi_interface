@@ -63,6 +63,26 @@ module axi_esdi_cmd_controller #(
     reg [16:0] data_out;    // bit 0 is odd parity bit
     reg is_query;           // 0 = command, 1 = configuration/status transfer
     reg [16:0] data_in;
+    reg esdi_transfer_ack_ff;
+
+    ila_0 your_instance_name (
+        .clk(csr_aclk), // input wire clk
+
+
+        .probe0(state), // input wire [2:0]  probe0  
+        .probe1(reading), // input wire [0:0]  probe1 
+        .probe2(bit_count), // input wire [5:0]  probe2 
+        .probe3(cycle_count), // input wire [31:0]  probe3 
+        .probe4(data_out), // input wire [15:0]  probe4 
+        .probe5(is_query), // input wire [0:0]  probe5 
+        .probe6(data_in), // input wire [15:0]  probe6
+        .probe7(esdi_transfer_req), // input wire [0:0]  probe7 
+        .probe8(esdi_command_data), // input wire [0:0]  probe8 
+        .probe9(esdi_transfer_ack_ff), // input wire [0:0]  probe9 
+        .probe10(esdi_confstat_data), // input wire [0:0]  probe10 
+        .probe11(buffered_data_out_valid), // input wire [0:0]  probe11 
+        .probe12(buffered_data_in_valid) // input wire [0:0]  probe12
+    );
 
     always @(posedge csr_aclk)
     begin
@@ -85,6 +105,7 @@ module axi_esdi_cmd_controller #(
             /* Serial Processing */
 
             cycle_count <= cycle_count + 1;
+            esdi_transfer_ack_ff <= esdi_transfer_ack;
 
             // Wait for data to send
             if (state == 0)
@@ -99,6 +120,8 @@ module axi_esdi_cmd_controller #(
                     bit_count <= 0;
                     cycle_count <= 0;
                 end
+                esdi_transfer_req <= 1;
+                esdi_command_data <= 1;
             end
             // Send a bit of data
             else if (state == 1)
@@ -113,7 +136,7 @@ module axi_esdi_cmd_controller #(
                     end
                     bit_count <= bit_count + 1;
                 end
-                if (cycle_count == DATA_SETUP)
+                else if (cycle_count == DATA_SETUP)
                 begin
                     esdi_transfer_req <= 0;
                     state <= 2;
@@ -124,7 +147,7 @@ module axi_esdi_cmd_controller #(
             else if (state == 2)
             begin
 
-                if (!esdi_transfer_ack)
+                if (!esdi_transfer_ack_ff)
                 begin
                     state <= 3;
                     cycle_count <= 0;
@@ -133,8 +156,7 @@ module axi_esdi_cmd_controller #(
                         data_in <= {data_in[15:0], !esdi_confstat_data};
                     end
                 end
-
-                if (cycle_count == BIT_TIMEOUT)
+                else if (cycle_count == BIT_TIMEOUT)
                 begin
                     state <= 0;
                     if (is_query)
@@ -159,7 +181,7 @@ module axi_esdi_cmd_controller #(
             else if (state == 4)
             begin
 
-                if (esdi_transfer_ack)
+                if (esdi_transfer_ack_ff)
                 begin
 
                     if (bit_count == 17)
@@ -197,8 +219,7 @@ module axi_esdi_cmd_controller #(
                     end
 
                 end
-
-                if (cycle_count == BIT_TIMEOUT)
+                else if (cycle_count == BIT_TIMEOUT)
                 begin
                     state <= 0;
                     if (is_query)
