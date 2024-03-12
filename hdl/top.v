@@ -5,8 +5,9 @@ module top (
     output esdi_command_data,
     input esdi_transfer_ack,
     input esdi_confstat_data,
-    input esdi_command_complete,
-    input esdi_attention
+    input esdi_index,
+    input esdi_sector,
+    output esdi_read_gate
 );
 
     soc_bd soc_bd_0 (
@@ -14,8 +15,11 @@ module top (
         .esdi_command_data      (esdi_command_data),
         .esdi_transfer_ack      (esdi_transfer_ack),
         .esdi_confstat_data     (esdi_confstat_data),
-        .esdi_command_complete  (esdi_command_complete),
-        .esdi_attention         (esdi_attention)
+        .esdi_command_complete  (1'b0),
+        .esdi_attention         (1'b0),
+        .esdi_index             (esdi_index),
+        .esdi_read_gate         (esdi_read_gate),
+        .esdi_sector            (esdi_sector)
     );
 
 endmodule

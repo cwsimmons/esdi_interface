@@ -65,24 +65,6 @@ module axi_esdi_cmd_controller #(
     reg [16:0] data_in;
     reg esdi_transfer_ack_ff;
 
-    ila_0 your_instance_name (
-        .clk(csr_aclk), // input wire clk
-
-
-        .probe0(state), // input wire [2:0]  probe0  
-        .probe1(reading), // input wire [0:0]  probe1 
-        .probe2(bit_count), // input wire [5:0]  probe2 
-        .probe3(cycle_count), // input wire [31:0]  probe3 
-        .probe4(data_out), // input wire [15:0]  probe4 
-        .probe5(is_query), // input wire [0:0]  probe5 
-        .probe6(data_in), // input wire [15:0]  probe6
-        .probe7(esdi_transfer_req), // input wire [0:0]  probe7 
-        .probe8(esdi_command_data), // input wire [0:0]  probe8 
-        .probe9(esdi_transfer_ack_ff), // input wire [0:0]  probe9 
-        .probe10(esdi_confstat_data), // input wire [0:0]  probe10 
-        .probe11(buffered_data_out_valid), // input wire [0:0]  probe11 
-        .probe12(buffered_data_in_valid) // input wire [0:0]  probe12
-    );
 
     always @(posedge csr_aclk)
     begin
