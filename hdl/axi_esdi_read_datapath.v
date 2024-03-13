@@ -1,8 +1,12 @@
 module axi_esdi_read_datapath #(
-
+    parameter MAX_BYTES_PER_PACKET = 2048
 ) (
     input csr_aclk,
     input csr_aresetn,
+    input parallel_aclk,
+    input parallel_aresetn,
+    input sector_aclk,
+    input sector_aresetn,
 
     input csr_awvalid,
     output csr_awready,
@@ -37,7 +41,8 @@ module axi_esdi_read_datapath #(
 
     output reg parallel_tvalid,
     input parallel_tready,
-    output reg [7:0] parallel_tdata
+    output reg [7:0] parallel_tdata,
+    output reg parallel_tlast,
 
     output reg sector_tvalid,
     input sector_tready,
@@ -75,6 +80,13 @@ module axi_esdi_read_datapath #(
     reg new_bit;
     reg new_bit_valid;
     reg [7:0] data_in;
+    reg [15:0] byte_count;
+    reg new_byte_valid;
+    reg new_byte_is_last;
+    reg [7:0] new_byte;
+    reg pending_valid;
+    reg pending_is_last;
+    reg [7:0] pending_data;
 
 
     assign sample_pulse = (use_internal_clock) ? internal_clock : (!read_clock_shift_reg[0] && read_clock_shift_reg[1]);
@@ -90,6 +102,11 @@ module axi_esdi_read_datapath #(
             bit_count <= 0;
             internal_clock <= 0;
             internal_clock_count <= 0;
+            byte_count <= 0;
+            new_byte_valid <= 0;
+            new_byte_is_last <= 0;
+            pending_valid <= 0;
+            pending_is_last <= 0;
 
             write_addr_valid <= 0;
             write_data_valid <= 0;
@@ -110,6 +127,7 @@ module axi_esdi_read_datapath #(
 
             internal_clock <= 0;
             new_bit_valid <= 0;
+            new_byte_valid <= 0;
 
             if (enable)
             begin
@@ -132,6 +150,7 @@ module axi_esdi_read_datapath #(
                     internal_clock_count <= internal_clock_count + 1;
                 end
 
+                // Deserialize the sampled bits
                 if (new_bit_valid)
                 begin
                     data_in <= {data_in[6:0], new_bit};
@@ -139,14 +158,50 @@ module axi_esdi_read_datapath #(
                     if (bit_count == 7)
                     begin
                         bit_count <= 0;
-                        parallel_tvalid <= 1;
-                        parallel_tdata <= {data_in[6:0], new_bit};
+                        new_byte_valid <= 1;
+                        new_byte_is_last <= !esdi_read_gate;
+                        new_byte <= {data_in[6:0], new_bit};
                     end
                     else
                     begin
                         bit_count <= bit_count + 1;
                     end
+                end
 
+                // Send the bytes out the stream, but hold them until we know if they are last or not
+                if (pending_valid && (new_byte_valid || pending_is_last))
+                begin
+                    pending_valid <= 0;
+                    parallel_tvalid <= 1;
+                    parallel_tdata <= pending_data;
+                
+                    if ((byte_count == MAX_BYTES_PER_PACKET - 1) || pending_is_last)
+                    begin
+                        byte_count <= 0;
+                        parallel_tlast <= 1;
+                    end
+                    else
+                    begin
+                        byte_count <= byte_count + 1;
+                        parallel_tlast <= 0;
+                    end
+                end
+
+                // Note: this must come after the above block, where pending_valid may have been cleared
+                if (new_byte_valid)
+                begin
+                    pending_valid <= 1;
+                    pending_data <= new_byte;
+                    pending_is_last <= new_byte_is_last;
+                end
+
+                // If after read gate is deasserted, bit_count has *settled* at a non zero number,
+                // then push those bits through by setting new_byte_valid early.
+                if (!esdi_read_gate && !new_bit_valid && bit_count != 0)
+                begin
+                    new_byte_valid <= 1;
+                    new_byte_is_last <= 1;
+                    new_byte <= data_in;
                 end
 
             end
