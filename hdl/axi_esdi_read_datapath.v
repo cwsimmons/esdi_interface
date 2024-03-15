@@ -199,6 +199,7 @@ module axi_esdi_read_datapath #(
                 // then push those bits through by setting new_byte_valid early.
                 if (!esdi_read_gate && !new_bit_valid && bit_count != 0)
                 begin
+                    bit_count <= 0;
                     new_byte_valid <= 1;
                     new_byte_is_last <= 1;
                     new_byte <= data_in;
