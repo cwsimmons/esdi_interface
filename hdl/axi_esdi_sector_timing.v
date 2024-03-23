@@ -47,6 +47,8 @@ module axi_esdi_sector_timing (
     reg [31:0] control_register;
     reg [31:0] address_assert;
     reg [31:0] address_deassert;
+    reg [31:0] data_area_assert;
+    reg [31:0] data_area_deassert;
 
     reg [31:0] cycle_count;
 
@@ -86,6 +88,10 @@ module axi_esdi_sector_timing (
                     esdi_read_gate <= 1;
                 if (cycle_count == address_deassert)
                     esdi_read_gate <= 0;
+                if (cycle_count == data_area_assert)
+                    esdi_read_gate <= 1;
+                if (cycle_count == data_area_deassert)
+                    esdi_read_gate <= 0;
             end
             else
             begin
@@ -122,6 +128,8 @@ module axi_esdi_sector_timing (
                     0 : control_register <= write_data;
                     1 : address_assert <= write_data;
                     2 : address_deassert <= write_data;
+                    3 : data_area_assert <= write_data;
+                    4 : data_area_deassert <= write_data;
                 endcase
 
                 csr_bvalid <= 1;
@@ -135,6 +143,8 @@ module axi_esdi_sector_timing (
                     0 : csr_rdata <= control_register;
                     1 : csr_rdata <= address_assert;
                     2 : csr_rdata <= address_deassert;
+                    3 : csr_rdata <= data_area_assert;
+                    4 : csr_rdata <= data_area_deassert;
                 endcase
 
                 csr_rvalid <= 1;
