@@ -107,6 +107,8 @@ module axi_esdi_read_datapath #(
             new_byte_is_last <= 0;
             pending_valid <= 0;
             pending_is_last <= 0;
+            parallel_tvalid <= 0;
+            sector_tvalid <= 0;
 
             write_addr_valid <= 0;
             write_data_valid <= 0;
