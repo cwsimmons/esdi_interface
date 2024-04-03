@@ -36,7 +36,10 @@ module axi_esdi_cmd_controller #(
     input esdi_transfer_ack,
     input esdi_confstat_data,
     input esdi_command_complete,
-    input esdi_attention
+    input esdi_attention,
+    input esdi_ready,
+    output reg [3:0] esdi_drive_select,
+    output reg [3:0] esdi_head_select
 );
 
     reg write_addr_valid;
@@ -63,7 +66,12 @@ module axi_esdi_cmd_controller #(
     reg [16:0] data_out;    // bit 0 is odd parity bit
     reg is_query;           // 0 = command, 1 = configuration/status transfer
     reg [16:0] data_in;
-    reg esdi_transfer_ack_ff;
+
+    reg [2:0] esdi_transfer_ack_shift;
+    reg [2:0] esdi_confstat_data_shift;
+    reg [2:0] esdi_command_complete_shift;
+    reg [2:0] esdi_attention_shift;
+    reg [2:0] esdi_ready_shift;
 
 
     always @(posedge csr_aclk)
@@ -87,7 +95,13 @@ module axi_esdi_cmd_controller #(
             /* Serial Processing */
 
             cycle_count <= cycle_count + 1;
-            esdi_transfer_ack_ff <= esdi_transfer_ack;
+
+            esdi_transfer_ack_shift <= {esdi_transfer_ack, esdi_transfer_ack_shift[2:1]};
+            esdi_confstat_data_shift <= {esdi_confstat_data, esdi_confstat_data_shift[2:1]};
+            esdi_command_complete_shift <= {esdi_command_complete, esdi_command_complete_shift[2:1]};
+            esdi_attention_shift <= {esdi_attention, esdi_attention_shift[2:1]};
+            esdi_ready_shift <= {esdi_ready, esdi_ready_shift[2:1]};
+            
 
             // Wait for data to send
             if (state == 0)
@@ -129,13 +143,13 @@ module axi_esdi_cmd_controller #(
             else if (state == 2)
             begin
 
-                if (!esdi_transfer_ack_ff)
+                if (!esdi_transfer_ack_shift[0])
                 begin
                     state <= 3;
                     cycle_count <= 0;
                     if (reading)
                     begin
-                        data_in <= {data_in[15:0], !esdi_confstat_data};
+                        data_in <= {data_in[15:0], !esdi_confstat_data_shift[0]};
                     end
                 end
                 else if (cycle_count == BIT_TIMEOUT)
@@ -163,7 +177,7 @@ module axi_esdi_cmd_controller #(
             else if (state == 4)
             begin
 
-                if (esdi_transfer_ack_ff)
+                if (esdi_transfer_ack_shift[0])
                 begin
 
                     if (bit_count == 17)
@@ -243,6 +257,8 @@ module axi_esdi_cmd_controller #(
                         buffered_data_out_valid <= 1;
                         buffered_data_out <= write_data;
                     end
+                    2 : esdi_drive_select <= write_data[3:0];
+                    3 : esdi_head_select <= write_data[3:0];
                 endcase
 
                 csr_bvalid <= 1;
@@ -258,6 +274,9 @@ module axi_esdi_cmd_controller #(
                         csr_rdata <= buffered_data_in;
                         buffered_data_in_valid <= 0;
                     end
+                    2 : csr_rdata <= {28'h0, esdi_drive_select};
+                    3 : csr_rdata <= {28'h0, esdi_head_select};
+                    4 : csr_rdata <= {29'h0, esdi_command_complete_shift[0], esdi_attention_shift[0], esdi_ready_shift[0]};
                 endcase
 
                 csr_rvalid <= 1;

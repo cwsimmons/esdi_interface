@@ -161,7 +161,7 @@ module axi_esdi_read_datapath #(
                     begin
                         bit_count <= 0;
                         new_byte_valid <= 1;
-                        new_byte_is_last <= !esdi_read_gate;
+                        new_byte_is_last <= 0;
                         new_byte <= {data_in[6:0], new_bit};
                     end
                     else
@@ -199,12 +199,19 @@ module axi_esdi_read_datapath #(
 
                 // If after read gate is deasserted, bit_count has *settled* at a non zero number,
                 // then push those bits through by setting new_byte_valid early.
-                if (!esdi_read_gate && !new_bit_valid && bit_count != 0)
+                if (!esdi_read_gate && !ignore_gate && !new_bit_valid)
                 begin
-                    bit_count <= 0;
-                    new_byte_valid <= 1;
-                    new_byte_is_last <= 1;
-                    new_byte <= data_in;
+                    if (bit_count != 0)
+                    begin
+                        bit_count <= 0;
+                        new_byte_valid <= 1;
+                        new_byte_is_last <= 1;
+                        new_byte <= data_in;
+                    end
+                    else
+                    begin
+                        pending_is_last <= 1;
+                    end
                 end
 
             end

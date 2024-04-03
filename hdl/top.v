@@ -21,8 +21,9 @@ module top (
 
     assign esdi_transfer_req = !esdi_transfer_reqn;
     assign esdi_command_data = !esdi_command_datan;
-    assign esdi_drive_select = 1'b1;
-    assign esdi_head_select = 4'h0;
+
+    wire [3:0] drive_select;
+    assign esdi_drive_select = drive_select == 4'h2;
 
     soc_bd soc_bd_0 (
         .esdi_transfer_req      (esdi_transfer_reqn),
@@ -35,7 +36,11 @@ module top (
         .esdi_read_gate         (esdi_read_gate),
         .esdi_sector            (esdi_sector),
         .esdi_read_clock        (esdi_read_clock),
-        .esdi_read_data         (esdi_read_data)
+        .esdi_read_data         (esdi_read_data),
+        .esdi_drive_select      (drive_select),
+        .esdi_head_select       (esdi_head_select),
+        .esdi_ready             (esdi_ready)
+
     );
 
 endmodule
