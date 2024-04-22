@@ -120,3 +120,14 @@ print(hex(msb16(bytes(sector), 0xffff)))
 # RT
 # reveng.exe -s -w 32 000002196a89cf83 0000021aa9850d0c 00000205f0e758f1 00090513b72e66df
 # width=32  poly=0x41044185  init=0x8e07e879  refin=false  refout=false  xorout=0x00000000  check=0xe655f925  residue=0x00000000  name=(none)
+
+# Micropolis 1558-15, soft sectored, unknown controller
+
+# Address Area
+# Include 0xFE sync byte at the start to use init=0x0000
+# reveng.exe -s -w 16 00010220000f2d 00010212006cda 0001012100654c 0001001400a81c
+# width=16  poly=0x1021  init=0x0ed1  refin=false  refout=false  xorout=0x0000  check=0x3382  residue=0x0000  name=(none)
+
+# Data Area
+# reveng.exe -s -w 32 -f s4.bin s7.bin s8.bin s9.bin
+# width=32  poly=0x140a0445  init=0x00000000  refin=false  refout=false  xorout=0x00000000  check=0x86aceee1  residue=0x00000000  name=(none)

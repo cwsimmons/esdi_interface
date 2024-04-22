@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <time.h>
 
 #define DMA_CTRL (0x30 >> 2)
 #define DMA_STAT (0x34 >> 2)
@@ -204,6 +205,8 @@ int main()
     }
 
     uint8_t buffer[2048];
+    uint8_t pad_bytes[16];
+    memset(pad_bytes, 0x00, 16);
 
     timer = &mem[(0x1000 >> 2)];
     rxdatapath = &mem[0x2000 >> 2];
@@ -244,24 +247,32 @@ int main()
 
     
 
-    timer[0] = 0b01000;
+    // timer[0] = 0b01000;
+    timer[0] = 0b101000;
 
-    // PC
+    // PC measured
     // timer[2] = 408;
     // timer[3] = 408 + 1872;
     // timer[4] = 2540;
     // timer[5] = 2540 + 42636;
 
-    // RT
+    // RT measured
     // timer[2] = 242;
     // timer[3] = 242 + 1940;
     // timer[4] = 2270;
     // timer[5] = 2270 + 42636 + 30;
 
-    timer[2] = 242;
-    timer[3] = 242 + 1940;
-    timer[4] = 2270;
-    timer[5] = 2270 + 21318 + 500;
+    // S36 guessed
+    // timer[2] = 242;
+    // timer[3] = 242 + 1940;
+    // timer[4] = 2270;
+    // timer[5] = 2270 + 21318 + 600;
+
+    // Soft Sector 1558 Guess
+    timer[2] = 0;
+    timer[3] = 1872;
+    timer[4] = 2300;
+    timer[5] = 2300 + 42836;
 
     // for (int i = 0; i < num_cylinders; i++) {
     // 	command(i & 0x0FFF);
@@ -287,16 +298,16 @@ int main()
 
     // printf("DMA status = %.8x\n", dma[DMA_STAT]);
     
-    for (int cyl = 0; cyl < 40; cyl++)
+    for (int cyl = 0; cyl < 2; cyl++)
     {
         command(cyl & 0xFFF);
         usleep(100000);
 
-        for (int head = 0; head < 7; head++) {
+        for (int head = 0; head < 5; head++) {
             
             set_head_select(head);
 
-            for (int sector = 0; sector < 66; sector++) {
+            for (int sector = 0; sector < 36; sector++) {
 
     //             printf(
     // "#####################################################\n\
@@ -305,6 +316,7 @@ int main()
     //                 head,
     //                 sector
     //             );
+                printf("Cyl = %.3d Head = %.2d Sec = %.2d\n", cyl, head, sector);
                 // command(cyl & 0x0FFF);
                 // sleep(1);
                 // timer_set_enable(true);
@@ -319,10 +331,43 @@ int main()
                 // printf("num tasks = %d\n", timer[6]);
 
                 // printf("Wait for timer module to be done\n");
-                while(timer[1] & 0x2) {}
+                clock_t start = clock();
+                while (((double)(clock() - start) / CLOCKS_PER_SEC) < 0.1) {
+                    if (!(timer[1] & 0x2))
+                        break;
+                }
+                if (timer[1] & 0x2) {
+                    printf("Sector not reached!!!\n");
+                    timer_set_enable(false);
+                    timer_reset();
+                    timer_set_enable(true);
+                    continue;
+                }
+
+
+
+
                 // printf("waiting for DMA to finish\n");
-                while(!(dma[DMA_STAT] & 0x2)) {}
+                start = clock();
+                while (((double)(clock() - start) / CLOCKS_PER_SEC) < 0.1) {
+                    if ((dma[DMA_STAT] & 0x2))
+                        break;
+                }
+
+                if (!(dma[DMA_STAT] & 0x2)) {
+                    printf("DMA Timed out!!!\n");
+                    reset_dma();
+                    // printf("DMA status = %.8x\n", dma[DMA_STAT]);
+                    dma_set_enable(true);
+                    // printf("DMA status = %.8x\n", dma[DMA_STAT]);
+                    // printf("Wait for DMA to indicate that it is running\n");
+                    while (dma[DMA_STAT] & 0x01) {}
+                    continue;
+                }
+
                 length = dma[DMA_LEN] & 0x03FFFFFF;
+
+
 
                 // for (int i = 1; i < 2; i++) {
                 //     dma[DMA_ADDR] = 0xa0004000 + (0x500 * i);
@@ -336,7 +381,7 @@ int main()
                 // timer_set_enable(false);
 
                 // printf("Print results\n");
-                // printf("Raw Length = %d\n", length);
+                printf("    Raw Length = %d\n", length);
                 // for (int i = 0; i < length; i++) {
                 // 	printf("%.2x ", bram[i]);
                 // }
@@ -345,23 +390,34 @@ int main()
                 int offset, bit;
                 bool no_data = false;
                 // printf("[%.4d,%d,%.2d] = ", cyl, head, sector);
-                if (length < 261 || length > 300) {
+                if (length < 517 || length > 550) {
                     no_data = true;
-                } else if (findbyte(&bram[0], length, 0xf8, &offset, &bit)) {
-                    // printf("Fount A1 at offset %d bit %d\n", offset, bit);
+                    printf("Unexpected data length!\n");
+                } else if (findbyte(&bram[0], length, 0xfe, &offset, &bit)) {
+                    printf("    Fount sync byte at offset %d bit %d\n", offset, bit);
                     // print_buff_start_at(&bram[0], length, offset, bit);
-                    copy_buff_start_at(buffer, &bram[0], length, offset+1, bit);
-                    fwrite(buffer, 1, 256, img_file);
+                    copy_buff_start_at(buffer, &bram[0], length, offset, bit);
+                    fwrite(buffer, 1, 512 + 5, img_file);
 
                 } else {
                     no_data = true;
+                    printf("Sync byte not found!\n");
                 }
 
                 if (no_data) {
-                    memset(buffer, 0xff, 256);
-                    fwrite(buffer, 1, 256, img_file);
+                    memset(buffer, 0xff, 517);
+                    fwrite(buffer, 1, 517, img_file);
                 }
+
+                fwrite(pad_bytes, 1, 11, img_file);
                 // usleep(10000);
+
+                // if (findbyte(&bram[0], length, 0xfe, &offset, &bit)) {
+                //     print_buff_start_at(&bram[0], length, offset, bit);
+                // } else {
+                //     printf("Sync byte not found!\n");
+                // }
+
             }
         }
 
