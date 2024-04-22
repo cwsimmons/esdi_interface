@@ -29,7 +29,8 @@ module axi_esdi_sector_timing (
 
     input esdi_index,
     input esdi_sector,
-    output reg esdi_read_gate
+    output reg esdi_read_gate,
+    output reg esdi_address_mark_enable
 );
 
     reg write_addr_valid;
@@ -52,6 +53,7 @@ module axi_esdi_sector_timing (
 
     reg [31:0] cycle_count;
     reg [15:0] sector_counter;
+    reg [31:0] next_ame_countdown;      // The number of cycles to wait before asserting Address Mark Enable again
 
     wire enable;
     wire soft_reset;
@@ -63,6 +65,7 @@ module axi_esdi_sector_timing (
     assign read_address_area = control_register[2];
     assign read_data_areas = control_register[3];
     assign read_without_tasking = control_register[4];
+    assign soft_sector_enable = control_register[5];
 
     reg task_write_valid;
     wire task_write_ready;
@@ -101,8 +104,10 @@ module axi_esdi_sector_timing (
         if (!csr_aresetn)
         begin
             esdi_read_gate <= 0;
+            esdi_address_mark_enable <= 0;
             index_shift_reg <= 3'b111;
             sector_shift_reg <= 3'b111;
+            next_ame_countdown <= 0;
 
             control_register <= 32'b0000;
             task_write_valid <= 0;
@@ -126,6 +131,14 @@ module axi_esdi_sector_timing (
             if (enable)
             begin
 
+                if (soft_sector_enable && (next_ame_countdown == 0))
+                begin
+                    esdi_address_mark_enable <= 1;
+                end
+
+                if (next_ame_countdown)
+                    next_ame_countdown <= next_ame_countdown - 1;
+
                 if (buffered_task_valid && !current_task_valid)
                 begin
                     current_task_valid <= 1;
@@ -136,7 +149,10 @@ module axi_esdi_sector_timing (
                 if (index_shift_reg[0] && !index_shift_reg[1])
                 begin
                     cycle_count <= 0;
-                    sector_counter <= 0;
+                    if (!soft_sector_enable)
+                        sector_counter <= 0;
+                    else
+                        sector_counter <= 16'hFFFF;
 
                     if (sector_counter == current_task_data)
                         current_task_valid <= 0;
@@ -148,6 +164,9 @@ module axi_esdi_sector_timing (
 
                     if (sector_counter == current_task_data)
                         current_task_valid <= 0;
+
+                    esdi_address_mark_enable <= 0;
+                    next_ame_countdown <= data_area_deassert;
                 end
 
                 if (cycle_count == address_assert &&
@@ -172,6 +191,8 @@ module axi_esdi_sector_timing (
             else
             begin
                 esdi_read_gate <= 0;
+                esdi_address_mark_enable <= 0;
+                next_ame_countdown <= 0;
             end
 
             if (soft_reset)

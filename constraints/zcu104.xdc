@@ -39,3 +39,6 @@ set_property PACKAGE_PIN C6       [get_ports "esdi_head_select[3]"];
 set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_head_select[3]"];
 set_property PACKAGE_PIN C17      [get_ports "esdi_drive_select"];
 set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_drive_select"];
+
+set_property PACKAGE_PIN G8       [get_ports "esdi_address_mark_enable"];            # PMOD0_0
+set_property IOSTANDARD LVCMOS33  [get_ports "esdi_address_mark_enable"];            # PMOD0_0

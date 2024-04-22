@@ -13,7 +13,8 @@ module top (
     input esdi_attention,
     input esdi_ready,
     output [3:0] esdi_head_select,
-    output esdi_drive_select
+    output esdi_drive_select,
+    output esdi_address_mark_enable
 );
 
     wire esdi_transfer_reqn;
@@ -39,7 +40,8 @@ module top (
         .esdi_read_data         (esdi_read_data),
         .esdi_drive_select      (drive_select),
         .esdi_head_select       (esdi_head_select),
-        .esdi_ready             (esdi_ready)
+        .esdi_ready             (esdi_ready),
+        .esdi_address_mark_enable (esdi_address_mark_enable)
 
     );
 
