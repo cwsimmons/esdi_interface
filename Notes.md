@@ -18,3 +18,17 @@ FPGA   | FMC     | ESDI Pin  | ESDI Name
  E12   | LA20_N  |  J1,24    | TRANSFER REQ
  H12   | LA22_N  |  J1,4     | HEAD SELECT 2(2)
  C6    | LA25_N  |  J1,2     | HEAD SELECT 2(3)
+
+
+# IBM PS/2 Controller
+
+The last head of each cylinder is missing the last 4 sectors
+
+byte 0    Sync = a1
+byte 1    LSB of sector count
+byte 2    MSB of sector count ...
+
+flags (byte 5):
+0x40 First Sector of Track
+0x80 Last Sector of Track
+0x20 Last head of cylinder
