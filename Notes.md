@@ -32,3 +32,14 @@ flags (byte 5):
 0x40 First Sector of Track
 0x80 Last Sector of Track
 0x20 Last head of cylinder
+
+# IBM RT Enhanced Controller
+
+## Address area
+
+* byte 0 = sync = 0xfe
+* byte 1 = high order cylinder?
+* byte 2 = low order cylinder
+* byte 3 = head
+* byte 4 = logical sector
+

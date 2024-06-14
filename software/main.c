@@ -20,6 +20,7 @@
 #include "controller.h"
 
 #include "ibm_ps2.h"
+#include "ibm_rt_enhanced.h"
 
 void shutdown() {
     printf("Shutting down.\n");
@@ -63,7 +64,8 @@ int main(int argc, char** argv)
     };
 
     static struct esdi_controller* controllers[] = {
-        &ibm_ps2
+        &ibm_ps2,
+        &ibm_rt_enhanced
     };
 
     signal(SIGINT, ctrlc);
@@ -99,7 +101,7 @@ int main(int argc, char** argv)
                 break;
 
             case 'C':
-                for (int i = 0; i < 1; i++) {
+                for (int i = 0; i < 2; i++) {
                     if (strcasecmp(controllers[i]->name, optarg) == 0)
                         controller = i;
                 }
