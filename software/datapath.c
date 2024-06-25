@@ -25,10 +25,12 @@
 #include <time.h>
 #include <stdio.h>
 
-#define DMA_CTRL (0x30 >> 2)
-#define DMA_STAT (0x34 >> 2)
-#define DMA_ADDR (0x48 >> 2)
-#define DMA_LEN  (0x58 >> 2)
+#define DMA_CTRL     (0x30 >> 2)
+#define DMA_STAT     (0x34 >> 2)
+#define DMA_CURRDESC (0x38 >> 2)
+#define DMA_TAILDESC (0x40 >> 2)
+#define DMA_ADDR     (0x48 >> 2)
+#define DMA_LEN      (0x58 >> 2)
 
 volatile uint32_t* sector_timer_base = 0;
 volatile uint32_t* datapath_base = 0;
@@ -107,8 +109,8 @@ void datapath_configure(
 
 void datapath_start() {
     reset_dma();
-    dma_set_enable(true);
-    while (dma_base[DMA_STAT] & 0x01) {}
+    // dma_set_enable(true);
+    // while (dma_base[DMA_STAT] & 0x01) {}
     datapath_base[0] = 0x3;
     datapath_sector_timer_reset();
     datapath_sector_timer_set_enable(true);
@@ -255,6 +257,130 @@ int read_area(int physical_sector, int area, uint8_t* data) {
     } else {
         return -4;
     }
+}
+
+// TODO: Make this readable
+int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw_sectors) {
+
+    datapath_sector_timer_set_address_area_enable(true);
+    datapath_sector_timer_set_data_area_enable(true);
+
+    volatile uint32_t* descriptors = (volatile uint32_t*) bram_base;
+
+    // Set current descriptor to the first
+    dma_base[DMA_CURRDESC] = 0xa0040000;
+
+    // Start DMA
+    dma_set_enable(true);
+    while (dma_base[DMA_STAT] & 0x01) {}
+
+    // Fill in the descriptor chain
+    for (int i = 0; i < (num_sectors * 2); i++) {
+        uint32_t next_desc_offset;
+        if (i != ((num_sectors * 2) - 1)) {
+            next_desc_offset = (i+1) * 0x40;
+        }
+        else {
+            next_desc_offset = 0x00;
+        }
+
+        descriptors[((i * 0x40) + 0x00) >> 2] = 0xa0040000 + next_desc_offset;        // Next Descriptor
+        descriptors[((i * 0x40) + 0x08) >> 2] = 0xa0040000 + 0x2000 + (i * 1024);     // Buffer Address
+        descriptors[((i * 0x40) + 0x18) >> 2] = 1024;                                 // Control (Just Length)
+        descriptors[((i * 0x40) + 0x1C) >> 2] = 0;                                    // Status
+    }
+
+    // Set the tail descriptor to the last
+    dma_base[DMA_TAILDESC] = 0xa0040000 + (((num_sectors * 2) - 1) * 0x40);
+
+    for (int i = 0; i < num_sectors; i++) {
+        sector_timer_base[6] = i;
+    }
+
+    // // Wait for all sectors to be reached
+    clock_t start = clock();
+    // while (((double)(clock() - start) / CLOCKS_PER_SEC) < 0.2) {
+    //     if (!(sector_timer_base[1] & 0x2))
+    //         break;
+    // }
+    // // If not every sector was reached, reset the sector timers task queue
+    // if (sector_timer_base[1] & 0x2) {
+    //     datapath_sector_timer_set_enable(false);
+    //     datapath_sector_timer_reset();
+    //     datapath_sector_timer_set_enable(true);
+    // }
+
+    // Wait for DMA to finish
+    // start = clock();
+    while (((double)(clock() - start) / CLOCKS_PER_SEC) < 1) {
+        if ((dma_base[DMA_STAT] & 0x2)) {
+            break;
+        }
+    }
+
+    datapath_sector_timer_set_enable(false);
+    datapath_sector_timer_reset();
+    datapath_sector_timer_set_enable(true);
+    dma_set_enable(false);
+
+    for (int i = 0; i < num_sectors; i++) {
+        raw_sectors[i].status = -1;
+    }
+
+    for (int i = 0; i < num_sectors; i++) {
+        if (descriptors[((i * (0x40 * 2)) + 0x1C) >> 2] & 0x80000000) {   // Is the address area descriptor complete?
+            int offset, bit;
+            int length = descriptors[((i * (0x40 * 2)) + 0x1C) >> 2] & 0x03FFFFFF;
+            // printf("Sector %d: Address Area Length = %d\n", i, length);
+            if (length < dp_controller_info->addr_area_length || length > (dp_controller_info->addr_area_length + 100)) {
+                // Wrong length
+                printf("sector %d: address area unexpected length\n", i);
+                continue;
+            }
+            if (!findbyte(&bram_base[(0x2000 + ((i*2) * 1024))], length, dp_controller_info->addr_area_sync_byte, &offset, &bit)) {
+                // Can't find sync byte
+                printf("sector %d: address area no sync byte\n", i);
+                continue;
+            }
+            if ((offset + (bit ? 1 : 0) + dp_controller_info->addr_area_length) > length) {
+                // Not enough data after the sync byte
+                printf("sector %d: address area Not enough data after the sync byte\n", i);
+                continue;
+            }
+            copy_buff_start_at(raw_sectors[i].address_area, &bram_base[(0x2000 + ((i*2) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->addr_area_length, offset, bit);
+        } else {
+            printf("Descriptor not complete for sector %d address area\n", i);
+            break;
+        }
+
+        if (descriptors[((i * (0x40 * 2)) + 0x40 + 0x1C) >> 2] & 0x80000000) {   // Is the data area descriptor complete?
+            int offset, bit;
+            int length = descriptors[((i * (0x40 * 2)) + 0x40 + 0x1C) >> 2] & 0x03FFFFFF;
+            // printf("Sector %d: Data Area Length = %d\n", i, length);
+            if (length < dp_controller_info->data_area_length || length > (dp_controller_info->data_area_length + 100)) {
+                // Wrong length
+                printf("sector %d: data are unexpected length\n", i);
+                continue;
+            }
+            if (!findbyte(&bram_base[(0x2000 + (((i*2) + 1) * 1024))], length, dp_controller_info->data_area_sync_byte, &offset, &bit)) {
+                // Can't find sync byte
+                printf("sector %d: data area no sync byte\n", i);
+                continue;
+            }
+            if ((offset + (bit ? 1 : 0) + dp_controller_info->data_area_length) > length) {
+                // Not enough data after the sync byte
+                printf("sector %d: address area Not enough data after the sync byte\n", i);
+                continue;
+            }
+            copy_buff_start_at(raw_sectors[i].data_area, &bram_base[(0x2000 + (((i*2) + 1) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->data_area_length, offset, bit);
+        } else {
+            printf("Descriptor not complete for sector %d data area\n", i);
+            break;
+        }
+        raw_sectors[i].status = 0;
+    }
+    return num_sectors;
+
 }
 
 int read_track(int num_sectors, int* physical_sectors, struct raw_sector* raw_sectors) {

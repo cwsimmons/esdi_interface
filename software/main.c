@@ -157,7 +157,7 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
 
-    volatile uint32_t* mem_base = (uint32_t*) mmap(NULL, 0x20000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0xa0000000);
+    volatile uint32_t* mem_base = (uint32_t*) mmap(NULL, 0x80000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0xa0000000);
     if (mem_base == MAP_FAILED) {
         printf("Failed to mmap\n");
         exit(EXIT_FAILURE);
@@ -166,7 +166,7 @@ int main(int argc, char** argv)
     serial_command_base = mem_base;
     sector_timer_base = &mem_base[(0x1000 >> 2)];
     datapath_base = &mem_base[0x2000 >> 2];
-    bram_base = (uint8_t*) &mem_base[0x4000 >> 2];
+    bram_base = (uint8_t*) &mem_base[0x40000 >> 2];
     dma_base = &mem_base[0x10000 >> 2];
 
     atexit(shutdown);
@@ -284,7 +284,7 @@ int main(int argc, char** argv)
                 }
 
                 // Read all sectors on the track
-                read_track(drive_params.sectors, physical_sectors, raw_sectors);
+                read_track_sg(drive_params.sectors, physical_sectors, raw_sectors);
 
                 // Process the sectors
                 for (int i = 0; i < drive_params.sectors; i++) {
