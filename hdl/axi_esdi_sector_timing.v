@@ -72,6 +72,7 @@ module axi_esdi_sector_timing (
 
     reg [31:0] cycle_count;
     reg [15:0] sector_counter;
+    reg [15:0] next_sector_counter;
     reg [31:0] next_ame_countdown;      // The number of cycles to wait before asserting Address Mark Enable again
     reg sector_reached;
 
@@ -106,7 +107,6 @@ module axi_esdi_sector_timing (
     wire filtered_esdi_sector = (sector_shift_reg[1] && sector_shift_reg[2]) ||
                                 (sector_shift_reg[1] && sector_shift_reg[3]) ||
                                 (sector_shift_reg[2] && sector_shift_reg[3]);
-
 
     fifo #(16, 7, 0) tasking_fifo (
         .clk            (csr_aclk),
@@ -195,10 +195,11 @@ module axi_esdi_sector_timing (
                 if (sector_shift_reg[0] && !filtered_esdi_sector)
                 begin
                     cycle_count <= 0;
-                    sector_counter <= sector_counter + 1;
+                    next_sector_counter = sector_counter + 1;
+                    sector_counter <= next_sector_counter;
 
                     sector_reached <= 0;
-                    if (current_task_valid && (current_task_data == sector_counter + 1))
+                    if (current_task_valid && (current_task_data == next_sector_counter))
                     begin
                         sector_reached <= 1;
                         current_task_valid <= 0;
