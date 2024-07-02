@@ -8,8 +8,9 @@ Eventually, I'd like to create a PCB that can accompany a cheaper (hopefully sig
 
 ### Todo:
 * Read the defect table
-* Change the Xilinx DMA to operate in its full featured mode. This should allow it to operate much much faster.
 * Add support for more formats.
+* Make sector timings more dynamic/adaptive. At the very least it needs to consider the drive's data rate.
+* Figure out an abstracted way to handle relocated sectors.
 
 ## License
 
