@@ -66,8 +66,11 @@ int main(int argc, char** argv)
     int heads = -1;
     int sectors = -1;
     int controller = -1;
+    int starting_cylinder = 0;
+    int max_attempts = 5;
 
     char extract_data_filename[FILENAME_MAX] = "";
+    char data_crc_analysis_prefix[FILENAME_MAX] = "";
 
     char* sector_mode_options[2] = {"hard", "soft"};
     
@@ -79,6 +82,9 @@ int main(int argc, char** argv)
         {"verbose",         no_argument,       0,  0 },
         {"extracted-data",  required_argument, 0, 'e'},
         {"controller",      required_argument, 0, 'C'},
+        {"start-cyl",       required_argument, 0, 'S'},
+        {"max-attempts",    required_argument, 0, 'r'},
+        {"data-crc-analysis", required_argument, 0, 1},
         {0,                 0,                 0,  0 }
     };
 
@@ -89,7 +95,7 @@ int main(int argc, char** argv)
 
     signal(SIGINT, ctrlc);
 
-    while ((c = getopt_long(argc, argv, "m:c:h:s:e:C:", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "m:c:h:s:e:C:S:r:", long_options, &option_index)) != -1) {
 
         switch (c) {
             case 0:
@@ -126,6 +132,18 @@ int main(int argc, char** argv)
                 }
                 break;
 
+            case 'S':
+                sscanf(optarg, "%i", &starting_cylinder);
+                break;
+
+            case 'r':
+                sscanf(optarg, "%i", &max_attempts);
+                break;
+
+            case 1:
+                strcpy(data_crc_analysis_prefix, optarg);
+                break;
+                
             case '?':
                 break;
 
@@ -195,7 +213,12 @@ int main(int argc, char** argv)
             drive_params.sectors = drive_params.sectors_hard;
         else
             drive_params.sectors = -1;
+    } else {
+        drive_params.sectors = sectors;
     }
+
+    if (max_attempts < 1)
+        max_attempts = 1;
 
     printf("Drive Parameters:\n");
     printf("    Sectoring Mode: %s\n", sector_mode_options[drive_params.is_soft_sectored == 1]);
@@ -248,7 +271,7 @@ int main(int argc, char** argv)
     datapath_start();
 
 
-    for (int j = 0; (j < drive_params.cylinders) && !stop; j++) {
+    for (int j = starting_cylinder; (j < drive_params.cylinders) && !stop; j++) {
 
         drive_seek(j);
         usleep(100000);
@@ -273,7 +296,7 @@ int main(int argc, char** argv)
             int attempt = 0;
 
             // Keep trying until we have all of the LBAs we expect
-            while ((attempt < 5) && (num_processed_lbas < num_expected_lbas) && !stop) {
+            while ((attempt < max_attempts) && (num_processed_lbas < num_expected_lbas) && !stop) {
 
                 if (attempt > 0) {
                     int rem = num_expected_lbas - num_processed_lbas;
@@ -296,6 +319,20 @@ int main(int argc, char** argv)
                     // Move on if there was a problem reading this sector
                     if (raw_sectors[i].status) {
                         continue;
+                    }
+
+                    // The point of this block is to aid in determining the data crc.
+                    // Since I don't know the if the sector is good,
+                    // I just have to write the first one.
+                    if ((strlen(data_crc_analysis_prefix) != 0) && (attempt == 0)) {
+                        char analysis_filename[FILENAME_MAX];
+                        snprintf(analysis_filename, FILENAME_MAX, "%s_%d_%d_%d.bin", data_crc_analysis_prefix, j, k, physical_sectors[i]);
+                        FILE* analysis_fd = fopen(analysis_filename, "wb");
+                        if (analysis_fd != NULL) {
+                            fwrite(raw_sectors[i].data_area, sizeof(uint8_t), controller_params->data_area_length, analysis_fd);
+                        } else {
+                            printf("Could not open %s for writting\n", analysis_filename);
+                        }
                     }
 
                     // Try to process the sector
@@ -330,7 +367,7 @@ int main(int argc, char** argv)
             }
 
             // Report what we could not read in the alloted attempts
-            if (num_processed_lbas < num_expected_lbas) {
+            if ((num_processed_lbas < num_expected_lbas) && !stop) {
                 printf("Could not read these LBAs\n");
                 for (int m = 0; m < num_expected_lbas; m++) {
                     bool good = false;
