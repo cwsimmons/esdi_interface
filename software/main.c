@@ -270,6 +270,8 @@ int main(int argc, char** argv)
     datapath_configure(&drive_params, controller_params);
     datapath_start();
 
+    flush_fifo();
+    reset_dma();
 
     for (int j = starting_cylinder; (j < drive_params.cylinders) && !stop; j++) {
 
