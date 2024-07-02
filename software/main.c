@@ -40,6 +40,7 @@
 
 #include "ibm_ps2.h"
 #include "ibm_rt_enhanced.h"
+#include "ultrastor_12f.h"
 
 void shutdown() {
     printf("Shutting down.\n");
@@ -90,7 +91,8 @@ int main(int argc, char** argv)
 
     static struct esdi_controller* controllers[] = {
         &ibm_ps2,
-        &ibm_rt_enhanced
+        &ibm_rt_enhanced,
+        &ultrastor_12f
     };
 
     signal(SIGINT, ctrlc);
@@ -126,7 +128,7 @@ int main(int argc, char** argv)
                 break;
 
             case 'C':
-                for (int i = 0; i < 2; i++) {
+                for (int i = 0; i < 3; i++) {
                     if (strcasecmp(controllers[i]->name, optarg) == 0)
                         controller = i;
                 }
