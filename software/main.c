@@ -94,7 +94,8 @@ int main(int argc, char** argv)
     static struct esdi_controller* controllers[] = {
         &ibm_ps2,
         &ibm_rt_enhanced,
-        &ultrastor_12f
+        &ultrastor_12f,
+        NULL
     };
 
     signal(SIGINT, ctrlc);
@@ -134,7 +135,7 @@ int main(int argc, char** argv)
                 break;
 
             case 'C':
-                for (int i = 0; i < 3; i++) {
+                for (int i = 0; controllers[i] != NULL; i++) {
                     if (strcasecmp(controllers[i]->name, optarg) == 0)
                         controller = i;
                 }
@@ -167,6 +168,12 @@ int main(int argc, char** argv)
 
     if (controller == -1) {
         printf("Unknown controller!\n");
+
+        printf("Controller options are:\n");
+        for (int i = 0; controllers[i] != NULL; i++) {
+            printf("%s\n", controllers[i]->name);
+        }
+
         exit(EXIT_FAILURE);
     }
 
