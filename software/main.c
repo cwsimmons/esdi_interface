@@ -62,6 +62,7 @@ int main(int argc, char** argv)
 
     bool verbose = false;
 
+    int drive_select = -1;
     int sector_mode = -1;
     int cylinders = -1;
     int heads = -1;
@@ -76,6 +77,7 @@ int main(int argc, char** argv)
     char* sector_mode_options[2] = {"hard", "soft"};
     
     static struct option long_options[] = {
+        {"drive",           required_argument, 0, 'd'},
         {"sector-mode",     required_argument, 0, 'm'},
         {"cylinders",       required_argument, 0, 'c'},
         {"heads",           required_argument, 0, 'h'},
@@ -97,11 +99,15 @@ int main(int argc, char** argv)
 
     signal(SIGINT, ctrlc);
 
-    while ((c = getopt_long(argc, argv, "m:c:h:s:e:C:S:r:", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "d:m:c:h:s:e:C:S:r:", long_options, &option_index)) != -1) {
 
         switch (c) {
             case 0:
                 verbose = true;
+                break;
+
+            case 'd':
+                sscanf(optarg, "%i", &drive_select);
                 break;
 
             case 'm':
@@ -154,6 +160,11 @@ int main(int argc, char** argv)
         }
     }
 
+    if (drive_select == -1) {
+        printf("Please specify the drive select number (-d)\n");
+        exit(EXIT_FAILURE);
+    }
+
     if (controller == -1) {
         printf("Unknown controller!\n");
         exit(EXIT_FAILURE);
@@ -192,7 +203,7 @@ int main(int argc, char** argv)
     atexit(shutdown);
 
 
-    set_drive_select(2);
+    set_drive_select(drive_select);
     drive_reset();
 
 
