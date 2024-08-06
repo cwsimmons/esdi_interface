@@ -330,6 +330,8 @@ int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw
 
     for (int i = 0; i < num_sectors; i++) {
         raw_sectors[i].status = -1;
+        raw_sectors[i].address_read_ok = false;
+        raw_sectors[i].data_read_ok = false;
     }
 
     for (int i = 0; i < num_sectors; i++) {
@@ -353,6 +355,7 @@ int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw
                 continue;
             }
             copy_buff_start_at(raw_sectors[i].address_area, &bram_base[(0x2000 + ((i*2) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->addr_area_length, offset, bit);
+            raw_sectors[i].address_read_ok = true;
         } else {
             printf("Descriptor not complete for sector %d address area\n", i);
             break;
@@ -378,6 +381,7 @@ int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw
                 continue;
             }
             copy_buff_start_at(raw_sectors[i].data_area, &bram_base[(0x2000 + (((i*2) + 1) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->data_area_length, offset, bit);
+            raw_sectors[i].data_read_ok = true;
         } else {
             printf("Descriptor not complete for sector %d data area\n", i);
             break;

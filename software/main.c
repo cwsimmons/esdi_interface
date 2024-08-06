@@ -340,7 +340,9 @@ int main(int argc, char** argv)
 
                     // Move on if there was a problem reading this sector
                     if (raw_sectors[i].status) {
-                        continue;
+                        // If we didn't even manage to get the address area then we got nothing, move on...
+                        if (!raw_sectors[i].address_read_ok)
+                            continue;
                     }
 
                     // The point of this block is to aid in determining the data crc.

@@ -47,7 +47,11 @@ struct raw_sector {
 
     // Info
     int status;
+
+    bool address_read_ok;
     uint8_t* address_area;
+
+    bool data_read_ok;
     uint8_t* data_area;
 };
 
