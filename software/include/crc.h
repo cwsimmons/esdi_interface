@@ -27,7 +27,7 @@ uint32_t crc32_msb(uint8_t* data, int length, uint32_t poly, uint32_t init);
 uint32_t crc32_lsb(uint8_t* data, int length, uint32_t poly, uint32_t init);
 uint16_t crc16_msb(uint8_t* data, int length, uint16_t poly, uint16_t init);
 uint16_t crc16_lsb(uint8_t* data, int length, uint16_t poly, uint16_t init);
-
+uint64_t crc48_msb(uint8_t* data, int length, uint64_t poly, uint64_t init);
 uint64_t crc56_msb(uint8_t* data, int length, uint64_t poly, uint64_t init);
 
 #endif // CRC_H

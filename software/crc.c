@@ -115,3 +115,22 @@ uint64_t crc56_msb(uint8_t* data, int length, uint64_t poly, uint64_t init) {
 
     return remainder & 0xffffffffffffff;
 }
+
+uint64_t crc48_msb(uint8_t* data, int length, uint64_t poly, uint64_t init) {
+
+    uint64_t remainder = init;
+
+    for (int i = 0; i < length; i++) {
+        remainder ^= ((uint64_t) data[i]) << 40;
+
+        for (int j = 0; j < 8; j++) {
+            if (remainder & 0x800000000000) {
+                remainder = (remainder << 1) ^ poly;
+            } else {
+                remainder = (remainder << 1);
+            }
+        }
+    }
+
+    return remainder & 0xffffffffffff;
+}

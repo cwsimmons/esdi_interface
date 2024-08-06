@@ -38,6 +38,7 @@
 #include "util.h"
 #include "controller.h"
 
+#include "ibm_5364.h"
 #include "ibm_ps2.h"
 #include "ibm_rt_enhanced.h"
 #include "ultrastor_12f.h"
@@ -92,6 +93,7 @@ int main(int argc, char** argv)
     };
 
     static struct esdi_controller* controllers[] = {
+        &ibm_5364,
         &ibm_ps2,
         &ibm_rt_enhanced,
         &ultrastor_12f,
@@ -368,6 +370,7 @@ int main(int argc, char** argv)
 
                     // Successful read
                     if (!decode_status) {
+                        if (!processed_sectors[i].marked_spare && !processed_sectors[i].marked_bad) {
 
                         // Determine if we have already processed this sector successfully 
                         bool new_lba = true;
@@ -380,11 +383,16 @@ int main(int argc, char** argv)
 
                         if (new_lba) {
                             processed_lbas[num_processed_lbas++] = processed_sectors[i].lba;
-
                             fseek(extract_fd, processed_sectors[i].lba * (controller_params->data_area_length - 5), SEEK_SET);
                             fwrite(processed_sectors[i].data, sizeof(uint8_t), processed_sectors[i].length, extract_fd);
+                            }
+
+                        } else if (processed_sectors[i].relocated) {
 
                         }
+
+                    } else {
+                        printf("Decode error on [%d,%d,%d] = %d\n", j, k, physical_sectors[i], decode_status);
                     }
                 }
                 attempt++;

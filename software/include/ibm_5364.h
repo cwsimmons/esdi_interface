@@ -18,52 +18,24 @@
 
 */
 
-#ifndef TYPES_H
-#define TYPES_H
+// IBM 5364 "Baby/36"
 
-#include <stdbool.h>
+#include "controller.h"
+
 #include <stdint.h>
+#include <stdbool.h>
 
-struct chs {
-    int c,h,s;
-};
+extern struct esdi_controller ibm_5364;
 
-struct drive_parameters {
+int ibm_5364_get_expected_lbas(
+    struct drive_parameters* drive_params,
+    int cylinder,
+    int head,
+    int* expected_lbas
+);
 
-    int heads;
-    int cylinders;
-    int sectors;
-
-    bool is_soft_sectored;
-    int sectors_hard;
-
-};
-
-struct raw_sector {
-    // Address
-    int cylinder;
-    int head;
-    int physical_sector;
-
-    // Info
-    int status;
-
-    bool address_read_ok;
-    uint8_t* address_area;
-
-    bool data_read_ok;
-    uint8_t* data_area;
-};
-
-struct processed_sector {
-    int lba;
-    
-    bool marked_bad;
-    bool marked_spare;
-    bool relocated;
-
-    int length;
-    uint8_t* data;
-};
-
-#endif // TYPES_H
+int ibm_5364_process_sector(
+    struct drive_parameters* drive_params,
+    struct raw_sector* raw,
+    struct processed_sector* processed
+);
