@@ -61,6 +61,14 @@ int ibm_ps2_get_expected_lbas(
     if ((cylinder >= drive_params->cylinders) || (head >= drive_params->heads))
         return -1;
 
+    // Fourth to last cylinder is all CE blocks
+    // Third to last cylinder is all secondary map blocks
+    // Second to last cylinder is all primary map blocks
+    // Last cylinder is unused?
+
+    if (cylinder >= (drive_params->cylinders - 4))
+        return 0;
+
     // For some reason this controller does not completely
     // fill up the highest platter.
     // Need to try different disk sizes to see how this value is actually computed.
@@ -96,14 +104,24 @@ int ibm_ps2_process_sector(
     int lba = (raw->address_area[1] <<  0) |
               (raw->address_area[2] <<  8) |
               (raw->address_area[3] << 16) |
-              (raw->address_area[4] << 24);
+              ((raw->address_area[4] & 0x0F) << 24);
+
+
+    if (lba == 0x0F7F7F7F) {
+        processed->marked_spare = true;
+        return 0;
+    } else {
+        processed->marked_spare = false;
+    }
+
+    processed->marked_bad = (raw->address_area[4] & 0x80) ? true : false;
+
+    if (processed->marked_bad) {
+        return 0;
+    }
 
     struct chs chs = ibm_ps2_lba_to_chs(drive_params, lba);
 
-    if ((raw->cylinder != chs.c) || (raw->head != chs.h)) {
-        printf("LBA looks like [%d,%d,%d]\n", chs.c, chs.h, chs.s);
-        return -2;  // We're didn't read this from where we though we did
-    }
 
     uint32_t data_check = crc32_msb(
         raw->data_area,
