@@ -1,10 +1,13 @@
 # A Zynq Based ESDI Disk Interface
 
-The immediate goal of this project is to create a solution for reading data off of old ESDI hard drives. At the moment it is capable of reading disk formatted by a couple of controllers, with retry logic, to create an image. More work needs to be done to increase confidence in its results.
+The immediate goal of this project is to create a solution for reading data off old ESDI hard drives. At the moment it is capable of reading disk formatted by a couple of controllers, with retry logic, to create an image. More work needs to be done to increase confidence in its results.
 
+I have made a PCB which allows me to connect a drive to my dev kit. It is an FMC based design, so unfortunately it only connects to dev boards which are over kill for this application. Nevertheless, the design files can be found under `esdi_fmc`
 Eventually, I'd like to create a PCB that can accompany a cheaper (hopefully significantly) dev board than the one I'm using. In the meantime, someone with prior Zynq experience should not have much trouble moving the design to a different board.
 
-![A picture of the breadboard setup](images/esdi_setup.jpg "Breadboard Setup")
+<img src="images/esdi2fmc.jpg" alt="Picture of FMC Adapter" width=500>
+
+<img src="images/esdi_setup.jpg" alt="A picture of the breadboard setup" width=500>
 
 ### Todo:
 * Read the defect table

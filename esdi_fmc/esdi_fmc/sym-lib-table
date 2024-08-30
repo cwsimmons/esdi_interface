@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "FMC")(type "KiCad")(uri "${KIPRJMOD}/../libraries/2024-03-17_17-19-43.kicad_sym")(options "")(descr ""))
+  (lib (name "custom")(type "KiCad")(uri "${KIPRJMOD}/../libraries/custom.kicad_sym")(options "")(descr ""))
+)
