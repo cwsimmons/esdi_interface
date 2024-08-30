@@ -24,38 +24,61 @@ set_property IOSTANDARD LVCMOS33  [get_ports "leds[2]"];
 set_property PACKAGE_PIN B5       [get_ports "leds[3]"];
 set_property IOSTANDARD LVCMOS33  [get_ports "leds[3]"];
 
-set_property PACKAGE_PIN E12      [get_ports "esdi_transfer_req"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_transfer_req"];
-set_property PACKAGE_PIN E17      [get_ports "esdi_command_data"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_command_data"];
-set_property PACKAGE_PIN D16      [get_ports "esdi_transfer_ack"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_transfer_ack"];
-set_property PACKAGE_PIN D12      [get_ports "esdi_confstat_data"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_confstat_data"];
-set_property PACKAGE_PIN B6       [get_ports "esdi_read_clock"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_read_clock"];
-set_property PACKAGE_PIN L17      [get_ports "esdi_index"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_index"];
-set_property PACKAGE_PIN J16      [get_ports "esdi_sector"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_sector"];
-set_property PACKAGE_PIN F18      [get_ports "esdi_read_gate"];
-set_property IOSTANDARD LVCMOS18  [get_ports "esdi_read_gate"];
-set_property PACKAGE_PIN B10      [get_ports "esdi_read_data"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_read_data"];
-set_property PACKAGE_PIN A13      [get_ports "esdi_attention"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_attention"];
-set_property PACKAGE_PIN L20      [get_ports "esdi_ready"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_ready"];
-set_property PACKAGE_PIN K18      [get_ports "esdi_head_select[0]"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_head_select[0]"];
-set_property PACKAGE_PIN F16      [get_ports "esdi_head_select[1]"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_head_select[1]"];
-set_property PACKAGE_PIN H12      [get_ports "esdi_head_select[2]"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_head_select[2]"];
-set_property PACKAGE_PIN C6       [get_ports "esdi_head_select[3]"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_head_select[3]"];
-set_property PACKAGE_PIN C17      [get_ports "esdi_drive_select"];
-set_property IOSTANDARD  LVCMOS18 [get_ports "esdi_drive_select"];
+## FMC Row H
+set_property PACKAGE_PIN J16      [get_ports "esdi_head_select[2]"]; # FMC_LPC_LA07_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_head_select[2]"]; # FMC_LPC_LA07_P
+set_property PACKAGE_PIN J15      [get_ports "esdi_head_select[0]"]; # FMC_LPC_LA07_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_head_select[0]"]; # FMC_LPC_LA07_N
+set_property PACKAGE_PIN A13      [get_ports "esdi_transfer_req"]; # FMC_LPC_LA11_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_transfer_req"]; # FMC_LPC_LA11_P
+set_property PACKAGE_PIN A12      [get_ports "esdi_drive_select[1]"]; # FMC_LPC_LA11_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_drive_select[1]"]; # FMC_LPC_LA11_N
+set_property PACKAGE_PIN D16      [get_ports "esdi_read_gate"]; # FMC_LPC_LA15_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_read_gate"]; # FMC_LPC_LA15_P
+set_property PACKAGE_PIN C16      [get_ports "esdi_address_mark_enable"]; # FMC_LPC_LA15_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_address_mark_enable"]; # FMC_LPC_LA15_N
+# set_property PACKAGE_PIN D12      [get_ports ""]; # FMC_LPC_LA19_P   Write Clock
+# set_property IOSTANDARD  LVCMOS12 [get_ports ""]; # FMC_LPC_LA19_P
 
-set_property PACKAGE_PIN G8       [get_ports "esdi_address_mark_enable"];            # PMOD0_0
-set_property IOSTANDARD LVCMOS33  [get_ports "esdi_address_mark_enable"];            # PMOD0_0
+
+# set_property PACKAGE_PIN B10      [get_ports ""]; # FMC_LPC_LA21_P   Write Data
+# set_property IOSTANDARD  LVCMOS12 [get_ports ""]; # FMC_LPC_LA21_P
+
+
+set_property PACKAGE_PIN B6       [get_ports "esdi_transfer_ack"]; # FMC_LPC_LA24_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_transfer_ack"]; # FMC_LPC_LA24_P
+set_property PACKAGE_PIN A6       [get_ports "esdi_sector"]; # FMC_LPC_LA24_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_sector"]; # FMC_LPC_LA24_N
+set_property PACKAGE_PIN M13      [get_ports "esdi_ready"]; # FMC_LPC_LA28_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_ready"]; # FMC_LPC_LA28_P
+set_property PACKAGE_PIN L13      [get_ports "esdi_command_complete"]; # FMC_LPC_LA28_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_command_complete"]; # FMC_LPC_LA28_N
+set_property PACKAGE_PIN E9       [get_ports "esdi_read_clock"]; # FMC_LPC_LA30_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_read_clock"]; # FMC_LPC_LA30_P
+
+
+set_property PACKAGE_PIN F8       [get_ports "esdi_read_data"]; # FMC_LPC_LA32_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_read_data"]; # FMC_LPC_LA32_P
+
+
+## FMC Row G
+set_property PACKAGE_PIN E18      [get_ports "esdi_head_select[3]"]; # FMC_LPC_LA08_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_head_select[3]"]; # FMC_LPC_LA08_P
+# set_property PACKAGE_PIN E17      [get_ports ""]; # FMC_LPC_LA08_N   Write Gate
+# set_property IOSTANDARD  LVCMOS12 [get_ports ""]; # FMC_LPC_LA08_N
+set_property PACKAGE_PIN G18      [get_ports "esdi_head_select[1]"]; # FMC_LPC_LA12_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_head_select[1]"]; # FMC_LPC_LA12_P
+set_property PACKAGE_PIN F18      [get_ports "esdi_drive_select[0]"]; # FMC_LPC_LA12_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_drive_select[0]"]; # FMC_LPC_LA12_N
+set_property PACKAGE_PIN D17      [get_ports "esdi_drive_select[2]"]; # FMC_LPC_LA16_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_drive_select[2]"]; # FMC_LPC_LA16_P
+set_property PACKAGE_PIN C17      [get_ports "esdi_command_data"]; # FMC_LPC_LA16_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_command_data"]; # FMC_LPC_LA16_N
+set_property PACKAGE_PIN C7       [get_ports "esdi_confstat_data"]; # FMC_LPC_LA25_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_confstat_data"]; # FMC_LPC_LA25_P
+set_property PACKAGE_PIN C6       [get_ports "esdi_attention"]; # FMC_LPC_LA25_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_attention"]; # FMC_LPC_LA25_N
+set_property PACKAGE_PIN K10      [get_ports "esdi_index"]; # FMC_LPC_LA29_P
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_index"]; # FMC_LPC_LA29_P
+set_property PACKAGE_PIN J10      [get_ports "esdi_drive_selected"]; # FMC_LPC_LA29_N
+set_property IOSTANDARD  LVCMOS12 [get_ports "esdi_drive_selected"]; # FMC_LPC_LA29_N

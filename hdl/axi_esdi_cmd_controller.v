@@ -58,7 +58,8 @@ module axi_esdi_cmd_controller #(
     input esdi_command_complete,
     input esdi_attention,
     input esdi_ready,
-    output reg [3:0] esdi_drive_select,
+    input esdi_drive_selected,
+    output reg [2:0] esdi_drive_select,
     output reg [3:0] esdi_head_select
 );
 
@@ -92,6 +93,7 @@ module axi_esdi_cmd_controller #(
     reg [2:0] esdi_command_complete_shift;
     reg [2:0] esdi_attention_shift;
     reg [2:0] esdi_ready_shift;
+    reg [2:0] esdi_drive_selected_shift;
 
 
     always @(posedge csr_aclk)
@@ -121,6 +123,7 @@ module axi_esdi_cmd_controller #(
             esdi_command_complete_shift <= {esdi_command_complete, esdi_command_complete_shift[2:1]};
             esdi_attention_shift <= {esdi_attention, esdi_attention_shift[2:1]};
             esdi_ready_shift <= {esdi_ready, esdi_ready_shift[2:1]};
+            esdi_drive_selected_shift <= {esdi_drive_selected, esdi_drive_selected_shift[2:1]};
             
 
             // Wait for data to send
@@ -277,7 +280,7 @@ module axi_esdi_cmd_controller #(
                         buffered_data_out_valid <= 1;
                         buffered_data_out <= write_data;
                     end
-                    2 : esdi_drive_select <= write_data[3:0];
+                    2 : esdi_drive_select <= write_data[2:0];
                     3 : esdi_head_select <= write_data[3:0];
                 endcase
 
@@ -294,9 +297,9 @@ module axi_esdi_cmd_controller #(
                         csr_rdata <= buffered_data_in;
                         buffered_data_in_valid <= 0;
                     end
-                    2 : csr_rdata <= {28'h0, esdi_drive_select};
+                    2 : csr_rdata <= {29'h0, esdi_drive_select};
                     3 : csr_rdata <= {28'h0, esdi_head_select};
-                    4 : csr_rdata <= {29'h0, esdi_command_complete_shift[0], esdi_attention_shift[0], esdi_ready_shift[0]};
+                    4 : csr_rdata <= {28'h0, esdi_drive_selected_shift[0], esdi_command_complete_shift[0], esdi_attention_shift[0], esdi_ready_shift[0]};
                 endcase
 
                 csr_rvalid <= 1;
