@@ -444,7 +444,7 @@ int main(int argc, char** argv)
                         } else if (!processed_sectors[i].marked_spare) {
 
                             if (array_add_uniquely(processed_lbas, &num_processed_lbas, processed_sectors[i].lba)) {
-                                fseek(extract_fd, processed_sectors[i].lba * (controller_params->data_area_length - 7), SEEK_SET);
+                                fseek(extract_fd, processed_sectors[i].lba * controller_params->sector_size, SEEK_SET);
                             fwrite(processed_sectors[i].data, sizeof(uint8_t), processed_sectors[i].length, extract_fd);
                             }
 

@@ -29,7 +29,7 @@ struct esdi_controller ibm_5364 = {
     "IBM_5364",
     242, 242+1940, 2270, 2270+21918+160+60,
     0xFE, 0xF8,
-    8, 263,
+    8, 263, 256,
     ibm_5364_get_expected_lbas,
     ibm_5364_process_sector
 };
@@ -99,6 +99,9 @@ int ibm_5364_process_sector(
     processed->lba = (chs.c * (drive_params->heads * drive_params->sectors)) +
                      (chs.h * (drive_params->sectors)) + 
                      (chs.s - 1);       // Or maybe we should subtract 1 earlier
+
+    processed->length = ibm_5364.sector_size;
+    memcpy(processed->data, &(raw->data_area[1]), ibm_5364.sector_size);
 
     return 0;
 }

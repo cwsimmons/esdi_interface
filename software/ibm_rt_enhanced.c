@@ -28,7 +28,7 @@ struct esdi_controller ibm_rt_enhanced = {
     "IBM_RT_ENHANCED",
     242, 242+1940, 2270, 2270+42766,
     0xFE, 0xFE,
-    9, 517,
+    9, 517, 512,
     ibm_rt_get_expected_lbas,
     ibm_rt_process_sector
 };
@@ -113,8 +113,8 @@ int ibm_rt_process_sector(
                      (chs.h * (drive_params->sectors)) + 
                      (chs.s - 1);       // Or maybe we should subtract 1 earlier
 
-    processed->length = ibm_rt_enhanced.data_area_length - 5;
-    memcpy(processed->data, &(raw->data_area[1]), ibm_rt_enhanced.data_area_length - 5);
+    processed->length = ibm_rt_enhanced.sector_size;
+    memcpy(processed->data, &(raw->data_area[1]), ibm_rt_enhanced.sector_size);
 
     return 0;
 }

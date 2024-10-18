@@ -29,7 +29,7 @@ struct esdi_controller ultrastor_12f = {
     "ULTRASTOR_12F",
     161+500, 161+1293+500, 1513+500, 1513+28510+500+160,
     0xa1, 0xa1,
-    9, 521,
+    9, 521, 512,
     ultrastor_12f_get_expected_lbas,
     ultrastor_12f_process_sector
 };
@@ -112,8 +112,8 @@ int ultrastor_12f_process_sector(
                      (chs.h * (drive_params->sectors)) + 
                      (chs.s - 1);
 
-    processed->length = 512;
-    memcpy(processed->data, &(raw->data_area[2]), 512);
+    processed->length = ultrastor_12f.sector_size;
+    memcpy(processed->data, &(raw->data_area[2]), ultrastor_12f.sector_size);
 
     return 0;
 }

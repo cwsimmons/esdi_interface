@@ -30,7 +30,7 @@ struct esdi_controller adaptec_acb2322 = {
     "ADAPTEC_ACB2322",
     4, 1972, 2270, 2270+42936,
     0xFE, 0xFE,
-    8, 519,
+    8, 519, 512,
     adaptec_acb2322_get_expected_lbas,
     adaptec_acb2322_process_sector
 };
@@ -96,8 +96,8 @@ int adaptec_acb2322_process_sector(
                      (chs.h * (drive_params->sectors)) + 
                      (chs.s - 1);
 
-    processed->length = adaptec_acb2322.data_area_length - 7;
-    memcpy(processed->data, &(raw->data_area[1]), adaptec_acb2322.data_area_length - 7);
+    processed->length = adaptec_acb2322.sector_size;
+    memcpy(processed->data, &(raw->data_area[1]), adaptec_acb2322.sector_size);
 
     return 0;
 }

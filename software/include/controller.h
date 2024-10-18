@@ -51,6 +51,7 @@ struct esdi_controller {
 
     int addr_area_length;
     int data_area_length;
+    int sector_size;
 
     get_expected_lbas_funcptr get_expected_lbas;
     process_sector_funcptr process_sector;

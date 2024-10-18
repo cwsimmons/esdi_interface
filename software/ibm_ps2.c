@@ -28,7 +28,7 @@ struct esdi_controller ibm_ps2 = {
     "IBM_PS2",
     408, 408+1872, 2540, 2540+42636,
     0xA1, 0xA1,
-    10, 517,
+    10, 517, 512,
     ibm_ps2_get_expected_lbas,
     ibm_ps2_process_sector
 };
@@ -134,8 +134,8 @@ int ibm_ps2_process_sector(
         return -3; // Bad data area CRC
 
     processed->lba = lba;
-    processed->length = ibm_ps2.data_area_length - 5;
-    memcpy(processed->data, &(raw->data_area[1]), ibm_ps2.data_area_length - 5);
+    processed->length = ibm_ps2.sector_size;
+    memcpy(processed->data, &(raw->data_area[1]), ibm_ps2.sector_size);
 
     return 0;
 }
