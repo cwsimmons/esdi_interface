@@ -49,6 +49,9 @@ int adaptec_acb2322_get_expected_lbas(
     if ((cylinder >= drive_params->cylinders) || (head >= drive_params->heads))
         return -1;
 
+    if (cylinder >= (drive_params->cylinders - 2))
+        return 0;
+
     int sectors_per_cylinder = drive_params->heads * drive_params->sectors;
 
     for (int i = 0; i < drive_params->sectors; i++) {
