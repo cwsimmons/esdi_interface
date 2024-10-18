@@ -55,7 +55,7 @@ bool findbyte(volatile uint8_t* buffer, int length, uint8_t pattern, int* offset
 void copy_buff_start_at(uint8_t* buffer_dest, volatile uint8_t* buffer_src, int length, int offset, int bit);
 int read_area(int physical_sector, int area, uint8_t* data);
 int read_track(int num_sectors, int* physical_sectors, struct raw_sector* raw_sectors);
-int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw_sectors);
+bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw_sectors);
 int flush_fifo();
 
 #endif // DATAPATH_H

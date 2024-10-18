@@ -259,7 +259,7 @@ int read_area(int physical_sector, int area, uint8_t* data) {
 }
 
 // TODO: Make this readable
-int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw_sectors) {
+bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw_sectors) {
 
     datapath_sector_timer_set_address_area_enable(true);
     datapath_sector_timer_set_data_area_enable(true);
@@ -334,6 +334,8 @@ int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw
         raw_sectors[i].data_read_ok = false;
     }
 
+    bool req_reset = false;
+
     for (int i = 0; i < num_sectors; i++) {
         if (descriptors[((i * (0x40 * 2)) + 0x1C) >> 2] & 0x80000000) {   // Is the address area descriptor complete?
             int offset, bit;
@@ -342,6 +344,7 @@ int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw
             if (length < dp_controller_info->addr_area_length || length > (dp_controller_info->addr_area_length + 100)) {
                 // Wrong length
                 raw_sectors[i].status = -2;
+                req_reset = true;
                 continue;
             }
             if (!findbyte(&bram_base[(0x2000 + ((i*2) * 1024))], length, dp_controller_info->addr_area_sync_byte, &offset, &bit)) {
@@ -368,6 +371,7 @@ int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw
             if (length < dp_controller_info->data_area_length || length > (dp_controller_info->data_area_length + 100)) {
                 // Wrong length
                 raw_sectors[i].status = -5;
+                req_reset = true;
                 continue;
             }
             if (!findbyte(&bram_base[(0x2000 + (((i*2) + 1) * 1024))], length, dp_controller_info->data_area_sync_byte, &offset, &bit)) {
@@ -388,7 +392,7 @@ int read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* raw
         }
         raw_sectors[i].status = 0;
     }
-    return num_sectors;
+    return req_reset;
 
 }
 

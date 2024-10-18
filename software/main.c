@@ -261,6 +261,8 @@ int main(int argc, char** argv)
 
     int num_processed_lbas;
 
+    bool reset_recommended = false;
+
     struct raw_sector* raw_sectors = (struct raw_sector*) malloc(sizeof(struct raw_sector) * allocated_sectors);
     struct processed_sector* processed_sectors = (struct processed_sector*) malloc(sizeof(struct processed_sector) * allocated_sectors);
 
@@ -330,8 +332,15 @@ int main(int argc, char** argv)
                     );
                 }
 
+                if (reset_recommended) {
+                    printf("Resetting datapath\n");
+                    flush_fifo();
+                    reset_dma();
+                    reset_recommended = false;
+                }
+
                 // Read all sectors on the track
-                read_track_sg(drive_params.sectors, physical_sectors, raw_sectors);
+                reset_recommended = read_track_sg(drive_params.sectors, physical_sectors, raw_sectors);
 
                 // Process the sectors
                 for (int i = 0; i < drive_params.sectors; i++) {
