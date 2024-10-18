@@ -41,6 +41,7 @@
 #include "ibm_5364.h"
 #include "ibm_ps2.h"
 #include "ibm_rt_enhanced.h"
+#include "adaptec_acb2322.h"
 #include "ultrastor_12f.h"
 
 void shutdown() {
@@ -129,6 +130,7 @@ int main(int argc, char** argv)
     };
 
     static struct esdi_controller* controllers[] = {
+        &adaptec_acb2322,
         &ibm_5364,
         &ibm_ps2,
         &ibm_rt_enhanced,
