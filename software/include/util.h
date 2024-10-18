@@ -22,7 +22,11 @@
 #define UTIL_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
+bool array_add_uniquely(int* array, int* array_length, int value);
+int array_find_value(int* array, int* array_length, int value);
+void array_remove_index(int* array, int* array_length, int index);
 void hex_print(uint8_t* buffer, int length);
 
 #endif // UTIL_H

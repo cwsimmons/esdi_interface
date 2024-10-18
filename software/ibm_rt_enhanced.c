@@ -64,6 +64,8 @@ int ibm_rt_process_sector(
     struct processed_sector* processed
 ) {
 
+    processed->marked_spare = false;
+
     uint32_t header_check = crc32_msb(
         raw->address_area,
         ibm_rt_enhanced.addr_area_length,
@@ -74,9 +76,21 @@ int ibm_rt_process_sector(
     if (header_check)
         return -1;  // Bad addr area CRC
 
+    if (raw->address_area[3] & 0x80) {
+        processed->marked_bad = true;
+        processed->relocated = (raw->address_area[3] & 0x40) ? false : true;
+    } else {
+        processed->marked_bad = false;
+        processed->relocated = false;
+    }
+
+    if (processed->marked_bad) {
+        return 0;
+    }
+
     struct chs chs = {
-        .c = (raw->address_area[1] <<  8) | (raw->address_area[2]),
-        .h = raw->address_area[3],
+        .c = ((raw->address_area[1] & 0x0F) <<  8) | (raw->address_area[2]),
+        .h = (raw->address_area[3] & 0x0F),
         .s = raw->address_area[4]
     };
 

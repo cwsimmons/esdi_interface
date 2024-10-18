@@ -22,6 +22,41 @@
 
 #include <stdio.h>
 
+bool array_add_uniquely(int* array, int* array_length, int value) {
+    bool new_value = true;
+    for (int i = 0; i < (*array_length); i++) {
+        if (array[i] == value) {
+            new_value = false;
+            break;
+        }
+    }
+
+    if (new_value) {
+        array[(*array_length)++] = value;
+    }
+
+    return new_value;
+}
+
+int array_find_value(int* array, int* array_length, int value) {
+    for (int i = 0; i < *array_length; i++) {
+        if (array[i] == value)
+            return i;
+    }
+    return -1;
+}
+
+void array_remove_index(int* array, int* array_length, int index) {
+    if ((index >= *array_length) || (*array_length < 0))
+        return;
+    
+    for (int i = index; i < (*array_length - 1); i++) {
+        array[i] = array[i+1];
+    }
+
+    *array_length--;
+}
+
 void hex_print(uint8_t* buffer, int length) {
     for (int i = 0; i < length; i++) {
         printf("%.2x ", buffer[i]);

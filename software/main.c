@@ -56,6 +56,42 @@ void ctrlc(int arg) {
     stop = true;
 }
 
+bool all_sectors_accounted_for(
+    int num_sectors,
+    bool* physical_sector_statuses,
+    int* expected_lbas,
+    int num_expected_lbas,
+    int* processed_lbas,
+    int num_processed_lbas
+) {
+
+    // Return true if either all sectors decoded without
+    // error or all expected LBAs were processed
+
+    bool all_sectors_decoded_ok = true;
+
+    for (int i = 0; i < num_sectors; i++) {
+        if (physical_sector_statuses[i] == false) {
+            all_sectors_decoded_ok = false;
+            break;
+        }
+    }
+
+    if (all_sectors_decoded_ok)
+        return true;
+
+    bool all_expected_are_processed = true;
+    for (int i = 0; i < num_expected_lbas; i++) {
+        if (array_find_value(processed_lbas, &num_processed_lbas, expected_lbas[i]) == -1) {
+            all_expected_are_processed = false;
+            break;
+        }
+    }
+
+    return all_expected_are_processed;
+
+}
+
 int main(int argc, char** argv)
 {
     int c;
@@ -257,6 +293,7 @@ int main(int argc, char** argv)
 
     int physical_sectors[128];
     int expected_lbas[128];
+    bool physical_sector_statuses[128];
     int processed_lbas[128];
 
     int num_processed_lbas;
@@ -309,6 +346,9 @@ int main(int argc, char** argv)
             set_head_select(k);
             usleep(10000);
 
+            for (int i = 0; i < drive_params.sectors; i++) {
+                physical_sector_statuses[i] = false;
+            }
 
             // Get the LBAs that we expect on this track
             int num_expected_lbas = controller_params->get_expected_lbas(
@@ -322,7 +362,18 @@ int main(int argc, char** argv)
             int attempt = 0;
 
             // Keep trying until we have all of the LBAs we expect
-            while ((attempt < max_attempts) && (num_processed_lbas < num_expected_lbas) && !stop) {
+            while (
+                (attempt < max_attempts) &&
+                !all_sectors_accounted_for(
+                    drive_params.sectors,
+                    physical_sector_statuses,
+                    expected_lbas,
+                    num_expected_lbas,
+                    processed_lbas,
+                    num_processed_lbas
+                ) &&
+                !stop
+            ) {
 
                 if (attempt > 0) {
                     int rem = num_expected_lbas - num_processed_lbas;
@@ -379,24 +430,21 @@ int main(int argc, char** argv)
 
                     // Successful read
                     if (!decode_status) {
-                        if (!processed_sectors[i].marked_spare && !processed_sectors[i].marked_bad) {
+                        
+                        physical_sector_statuses[i] = true;
 
-                        // Determine if we have already processed this sector successfully 
-                        bool new_lba = true;
-                        for (int m = 0; m < num_processed_lbas; m++) {
-                            if (processed_lbas[m] == processed_sectors[i].lba) {
-                                new_lba = false;
-                                break;
-                            }
+                        if (processed_sectors[i].marked_bad) {
+
+                            if (processed_sectors[i].relocated) {
+                                //array_add_uniquely(relocated_lbas, num_relocated_sectors);
                         }
 
-                        if (new_lba) {
-                            processed_lbas[num_processed_lbas++] = processed_sectors[i].lba;
-                            fseek(extract_fd, processed_sectors[i].lba * (controller_params->data_area_length - 5), SEEK_SET);
+                        } else if (!processed_sectors[i].marked_spare) {
+
+                            if (array_add_uniquely(processed_lbas, &num_processed_lbas, processed_sectors[i].lba)) {
+                                fseek(extract_fd, processed_sectors[i].lba * (controller_params->data_area_length - 7), SEEK_SET);
                             fwrite(processed_sectors[i].data, sizeof(uint8_t), processed_sectors[i].length, extract_fd);
                             }
-
-                        } else if (processed_sectors[i].relocated) {
 
                         }
 
