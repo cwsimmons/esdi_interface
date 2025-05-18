@@ -19,6 +19,8 @@
 */
 
 #include "serial_command.h"
+#include <stdio.h>
+#include <time.h>
 
 volatile uint32_t* serial_command_base = 0;
 int serial_retries = 3;
@@ -30,7 +32,13 @@ int serial_query(uint16_t command, uint16_t* response) {
     }
 
     // Wait for module to be ready
-    while(serial_command_base[0] & 0x01) {}
+    clock_t start = clock();
+    while(serial_command_base[0] & 0x01) {
+        if (((double)(clock() - start) / CLOCKS_PER_SEC) > 1) {
+            printf("Serial interface never became ready.\n");
+            return -1;
+        }
+    }
 
     uint32_t resp;
 
@@ -43,14 +51,22 @@ int serial_query(uint16_t command, uint16_t* response) {
     serial_command_base[1] = ((uint32_t) command) | (1 << 16);
 
     // Wait for response to arrive and read
-    while(!(serial_command_base[0] & 0x2)) {}
+    start = clock();
+    while(!(serial_command_base[0] & 0x2)) {
+        if (((double)(clock() - start) / CLOCKS_PER_SEC) > 1) {
+            printf("Device did not respond.\n");
+            return -1;
+        }
+    }
     resp = serial_command_base[1];
 
     // Check result for error conditions
     if (resp & 0x10000) {
+        printf("bad parity\n");
         return -2;  // Bad parity
     }
     if (resp & 0x20000) {
+        printf("serial timout\n");
         return -3;  // Bit timeout
     }
 
@@ -65,7 +81,13 @@ int serial_command(uint16_t command) {
     }
 
     // Wait for module to be ready
-    while(serial_command_base[0] & 0x01) {}
+    clock_t start = clock();
+    while(serial_command_base[0] & 0x01) {
+        if (((double)(clock() - start) / CLOCKS_PER_SEC) > 1) {
+            printf("Serial interface never became ready.\n");
+            return -1;
+        }
+    }
 
     // Issue the command
     serial_command_base[1] = (uint32_t) command;

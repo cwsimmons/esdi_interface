@@ -324,6 +324,12 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
 
+    datapath_sector_timer_reset();
+    datapath_sector_timer_set_enable(true);
+    usleep(100000);
+    printf("nummber of sector seen by interface = %d\n", sector_timer_base[7]);
+    datapath_sector_timer_set_enable(false);
+
     // I thought there might be time when we don't want to read all
     // of the sectors on the track. Could probably be removed.
     for (int i = 0; i < drive_params.sectors; i++) {
@@ -387,6 +393,7 @@ int main(int argc, char** argv)
 
                 if (reset_recommended) {
                     printf("Resetting datapath\n");
+                    reset_dma();
                     flush_fifo();
                     reset_dma();
                     reset_recommended = false;
@@ -405,8 +412,10 @@ int main(int argc, char** argv)
                     // Move on if there was a problem reading this sector
                     if (raw_sectors[i].status) {
                         // If we didn't even manage to get the address area then we got nothing, move on...
-                        if (!raw_sectors[i].address_read_ok)
+                        if (!raw_sectors[i].address_read_ok) {
+                            printf("Read error on [%d,%d,%d] = %d\n", j, k, physical_sectors[i], raw_sectors[i].status);
                             continue;
+                        }
                     }
 
                     // The point of this block is to aid in determining the data crc.
@@ -439,13 +448,13 @@ int main(int argc, char** argv)
 
                             if (processed_sectors[i].relocated) {
                                 //array_add_uniquely(relocated_lbas, num_relocated_sectors);
-                        }
+                            }
 
                         } else if (!processed_sectors[i].marked_spare) {
 
                             if (array_add_uniquely(processed_lbas, &num_processed_lbas, processed_sectors[i].lba)) {
                                 fseek(extract_fd, processed_sectors[i].lba * controller_params->sector_size, SEEK_SET);
-                            fwrite(processed_sectors[i].data, sizeof(uint8_t), processed_sectors[i].length, extract_fd);
+                                fwrite(processed_sectors[i].data, sizeof(uint8_t), processed_sectors[i].length, extract_fd);
                             }
 
                         }

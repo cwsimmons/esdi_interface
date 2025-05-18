@@ -77,7 +77,13 @@ void datapath_sector_timer_set_soft_sector(bool is_soft) {
 
 void reset_dma() {
     dma_base[DMA_CTRL] = 0x4;
-    while(dma_base[DMA_CTRL] & 0x04) {}
+    clock_t start = clock();
+    while(dma_base[DMA_CTRL] & 0x04) {
+        if (((double)(clock() - start) / CLOCKS_PER_SEC) > 1) {
+            printf("DMA did not complete reset.\n");
+            break;
+        }
+    }
 }
 
 void dma_set_enable(bool enable) {
@@ -275,7 +281,14 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
 
     // Start DMA
     dma_set_enable(true);
-    while (dma_base[DMA_STAT] & 0x01) {}
+
+    clock_t start = clock();
+    while (dma_base[DMA_STAT] & 0x01) {
+        if (((double)(clock() - start) / CLOCKS_PER_SEC) > 1) {
+            printf("DMA did not leave halted state.\n");
+            break;
+        }
+    }
 
     // Fill in the descriptor chain
     for (int i = 0; i < (num_sectors * 2); i++) {
@@ -288,7 +301,7 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
         }
 
         descriptors[((i * 0x40) + 0x00) >> 2] = 0xa0040000 + next_desc_offset;        // Next Descriptor
-        descriptors[((i * 0x40) + 0x08) >> 2] = 0xa0040000 + 0x2000 + (i * 1024);     // Buffer Address
+        descriptors[((i * 0x40) + 0x08) >> 2] = 0xa0040000 + 0x4000 + (i * 1024);     // Buffer Address
         descriptors[((i * 0x40) + 0x18) >> 2] = 1024;                                 // Control (Just Length)
         descriptors[((i * 0x40) + 0x1C) >> 2] = 0;                                    // Status
     }
@@ -299,11 +312,15 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
     usleep(10000);
 
     for (int i = 0; i < num_sectors; i++) {
+        if (sector_timer_base[1] & 0x01) {
+            printf("Sector timer FIFO is full! (i=%d)\n", i);
+            break;
+        }
         sector_timer_base[6] = i;
     }
 
     // // Wait for all sectors to be reached
-    clock_t start = clock();
+    start = clock();
     // while (((double)(clock() - start) / CLOCKS_PER_SEC) < 0.2) {
     //     if (!(sector_timer_base[1] & 0x2))
     //         break;
@@ -317,16 +334,26 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
 
     // Wait for DMA to finish
     // start = clock();
-    while (((double)(clock() - start) / CLOCKS_PER_SEC) < 1) {
+    while (((double)(clock() - start) / CLOCKS_PER_SEC) < 3) {
         if ((dma_base[DMA_STAT] & 0x2)) {
             break;
         }
+    }
+    if (!(dma_base[DMA_STAT] & 0x2)) {
+        printf("DMA Timeout\n");
+        printf("sector_timing[1] = 0x%.8x\n", sector_timer_base[1]);
+        printf("sector_timing[6] = 0x%.8x\n", sector_timer_base[6]);
     }
 
     datapath_sector_timer_set_enable(false);
     datapath_sector_timer_reset();
     datapath_sector_timer_set_enable(true);
     dma_set_enable(false);
+
+    if (datapath_base[2] & 0x01) {
+        printf("Datapath overflow detected\n");
+        datapath_base[2] = 0;
+    }
 
     for (int i = 0; i < num_sectors; i++) {
         raw_sectors[i].status = -1;
@@ -347,7 +374,7 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
                 req_reset = true;
                 continue;
             }
-            if (!findbyte(&bram_base[(0x2000 + ((i*2) * 1024))], length, dp_controller_info->addr_area_sync_byte, &offset, &bit)) {
+            if (!findbyte(&bram_base[(0x4000 + ((i*2) * 1024))], length, dp_controller_info->addr_area_sync_byte, &offset, &bit)) {
                 // Can't find sync byte
                 raw_sectors[i].status = -3;
                 continue;
@@ -357,10 +384,11 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
                 raw_sectors[i].status = -4;
                 continue;
             }
-            copy_buff_start_at(raw_sectors[i].address_area, &bram_base[(0x2000 + ((i*2) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->addr_area_length, offset, bit);
+            copy_buff_start_at(raw_sectors[i].address_area, &bram_base[(0x4000 + ((i*2) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->addr_area_length, offset, bit);
             raw_sectors[i].address_read_ok = true;
         } else {
             printf("Descriptor not complete for sector %d address area\n", i);
+            req_reset = true;
             break;
         }
 
@@ -374,7 +402,7 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
                 req_reset = true;
                 continue;
             }
-            if (!findbyte(&bram_base[(0x2000 + (((i*2) + 1) * 1024))], length, dp_controller_info->data_area_sync_byte, &offset, &bit)) {
+            if (!findbyte(&bram_base[(0x4000 + (((i*2) + 1) * 1024))], length, dp_controller_info->data_area_sync_byte, &offset, &bit)) {
                 // Can't find sync byte
                 raw_sectors[i].status = -6;
                 continue;
@@ -384,10 +412,11 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
                 raw_sectors[i].status = -7;
                 continue;
             }
-            copy_buff_start_at(raw_sectors[i].data_area, &bram_base[(0x2000 + (((i*2) + 1) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->data_area_length, offset, bit);
+            copy_buff_start_at(raw_sectors[i].data_area, &bram_base[(0x4000 + (((i*2) + 1) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->data_area_length, offset, bit);
             raw_sectors[i].data_read_ok = true;
         } else {
             printf("Descriptor not complete for sector %d data area\n", i);
+            req_reset = true;
             break;
         }
         raw_sectors[i].status = 0;
@@ -418,7 +447,13 @@ int flush_fifo() {
 
     // Start DMA
     dma_set_enable(true);
-    while (dma_base[DMA_STAT] & 0x01) {}
+    clock_t start = clock();
+    while (dma_base[DMA_STAT] & 0x01) {
+        if (((double)(clock() - start) / CLOCKS_PER_SEC) > 1) {
+            printf("DMA did not leave halted state.\n");
+            break;
+        }
+    }
 
     // Fill in the descriptor chain
     for (int i = 0; i < 128; i++) {
@@ -431,7 +466,7 @@ int flush_fifo() {
         }
 
         descriptors[((i * 0x40) + 0x00) >> 2] = 0xa0040000 + next_desc_offset;        // Next Descriptor
-        descriptors[((i * 0x40) + 0x08) >> 2] = 0xa0040000 + 0x2000 + (i * 1024);     // Buffer Address
+        descriptors[((i * 0x40) + 0x08) >> 2] = 0xa0040000 + 0x4000 + (i * 1024);     // Buffer Address
         descriptors[((i * 0x40) + 0x18) >> 2] = 1024;                                 // Control (Just Length)
         descriptors[((i * 0x40) + 0x1C) >> 2] = 0;                                    // Status
     }
@@ -442,7 +477,7 @@ int flush_fifo() {
     usleep(1000);
 
     // Wait for DMA to finish
-    clock_t start = clock();
+    start = clock();
     while (((double)(clock() - start) / CLOCKS_PER_SEC) < 0.02) {
         if ((dma_base[DMA_STAT] & 0x2)) {
             break;

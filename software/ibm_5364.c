@@ -48,15 +48,15 @@ int ibm_5364_get_expected_lbas(
     if ((cylinder >= drive_params->cylinders) || (head >= drive_params->heads))
         return -1;
 
-    int sectors_per_cylinder = (drive_params->heads * drive_params->sectors);
+    int sectors_per_cylinder = (drive_params->heads * (drive_params->sectors - 1));
 
-    for (int i = 0; i < drive_params->sectors; i++) {
+    for (int i = 0; i < drive_params->sectors - 1; i++) {
         expected_lbas[i] = (sectors_per_cylinder * cylinder) +
-                           (drive_params->sectors * head) +
+                           ((drive_params->sectors - 1) * head) +
                            i;
     }
 
-    return drive_params->sectors;
+    return drive_params->sectors - 1;
 }
 
 int ibm_5364_process_sector(
@@ -78,6 +78,8 @@ int ibm_5364_process_sector(
     if (raw->address_area[4] == 0xFF) {
         processed->marked_spare = true;
         return 0;
+    } else {
+        processed->marked_spare = false;
     }
 
     struct chs chs = {
@@ -96,9 +98,9 @@ int ibm_5364_process_sector(
     if (data_check)
         return -3; // Bad data area CRC
 
-    processed->lba = (chs.c * (drive_params->heads * drive_params->sectors)) +
-                     (chs.h * (drive_params->sectors)) + 
-                     (chs.s - 1);       // Or maybe we should subtract 1 earlier
+    processed->lba = (chs.c * (drive_params->heads * (drive_params->sectors - 1))) +
+                     (chs.h * (drive_params->sectors - 1)) + 
+                     (chs.s);       // These sector numbers from the header are zero based
 
     processed->length = ibm_5364.sector_size;
     memcpy(processed->data, &(raw->data_area[1]), ibm_5364.sector_size);
