@@ -100,6 +100,8 @@ module axi_esdi_sector_timing (
     reg current_task_valid;
     reg [15:0] current_task_data;
 
+    reg [15:0] max_sector_seen;
+
     wire filtered_esdi_index =  (index_shift_reg[1] && index_shift_reg[2]) ||
                                 (index_shift_reg[1] && index_shift_reg[3]) ||
                                 (index_shift_reg[2] && index_shift_reg[3]);
@@ -108,7 +110,7 @@ module axi_esdi_sector_timing (
                                 (sector_shift_reg[1] && sector_shift_reg[3]) ||
                                 (sector_shift_reg[2] && sector_shift_reg[3]);
 
-    fifo #(16, 7, 0) tasking_fifo (
+    fifo #(16, 8, 0) tasking_fifo (
         .clk            (csr_aclk),
         .resetn         (!(!csr_aresetn || soft_reset)),
 
@@ -137,6 +139,7 @@ module axi_esdi_sector_timing (
             sector_shift_reg <= 5'b11111;
             next_ame_countdown <= 0;
             sector_reached <= 0;
+            max_sector_seen <= 16'hffff;
 
             control_register <= 32'b0000;
             task_write_valid <= 0;
@@ -178,6 +181,7 @@ module axi_esdi_sector_timing (
                 if (index_shift_reg[0] && !filtered_esdi_index)
                 begin
                     cycle_count <= 0;
+                    max_sector_seen <= sector_counter;
                     if (!soft_sector_enable)
                     begin
                         sector_counter <= 0;
@@ -289,6 +293,7 @@ module axi_esdi_sector_timing (
                     4 : csr_rdata <= data_area_assert;
                     5 : csr_rdata <= data_area_deassert;
                     6 : csr_rdata <= {25'b0, tasks_pending};
+                    7 : csr_rdata <= {16'h0000, max_sector_seen};
                 endcase
 
                 csr_rvalid <= 1;

@@ -107,6 +107,7 @@ module axi_esdi_read_datapath #(
     reg pending_valid;
     reg pending_is_last;
     reg [7:0] pending_data;
+    reg overflow;
 
 
     assign sample_pulse = (use_internal_clock) ? internal_clock : (!read_clock_shift_reg[0] && read_clock_shift_reg[1]);
@@ -129,6 +130,7 @@ module axi_esdi_read_datapath #(
             pending_is_last <= 0;
             parallel_tvalid <= 0;
             sector_tvalid <= 0;
+            overflow <= 0;
 
             write_addr_valid <= 0;
             write_data_valid <= 0;
@@ -196,6 +198,9 @@ module axi_esdi_read_datapath #(
                     pending_valid <= 0;
                     parallel_tvalid <= 1;
                     parallel_tdata <= pending_data;
+
+                    if (parallel_tvalid && !parallel_tready)
+                        overflow <= 1; 
                 
                     if ((byte_count == MAX_BYTES_PER_PACKET - 1) || pending_is_last)
                     begin
@@ -267,6 +272,7 @@ module axi_esdi_read_datapath #(
                 case (write_addr[4:2])
                     0 : control_register <= write_data;
                     1 : internal_clocks_per_bit <= write_data[7:0];
+                    2 : overflow <= write_data[0];
                 endcase
 
                 csr_bvalid <= 1;
@@ -279,6 +285,7 @@ module axi_esdi_read_datapath #(
                 case (csr_araddr[4:2])
                     0 : csr_rdata <= control_register;
                     1 : csr_rdata <= {24'h0, internal_clocks_per_bit};
+                    2 : csr_rdata <= {31'h0, overflow};
                 endcase
 
                 csr_rvalid <= 1;
