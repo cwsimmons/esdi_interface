@@ -44,6 +44,9 @@
 #include "adaptec_acb2322.h"
 #include "ultrastor_12f.h"
 
+#define EMULATION_DATA_OFFSET 1024
+#define EMULATION_FILE_ALIGNMENT 16
+
 void shutdown() {
     printf("Shutting down.\n");
     set_drive_select(0);
@@ -111,6 +114,7 @@ int main(int argc, char** argv)
 
     char extract_data_filename[FILENAME_MAX] = "";
     char data_crc_analysis_prefix[FILENAME_MAX] = "";
+    char emulation_file[FILENAME_MAX] = "";
 
     char* sector_mode_options[2] = {"hard", "soft"};
     
@@ -126,6 +130,7 @@ int main(int argc, char** argv)
         {"start-cyl",       required_argument, 0, 'S'},
         {"max-attempts",    required_argument, 0, 'r'},
         {"data-crc-analysis", required_argument, 0, 1},
+        {"emulation-file",  required_argument, 0,   2},
         {0,                 0,                 0,  0 }
     };
 
@@ -192,6 +197,10 @@ int main(int argc, char** argv)
             case 1:
                 strcpy(data_crc_analysis_prefix, optarg);
                 break;
+
+            case 2:
+                strcpy(emulation_file, optarg);
+                break;
                 
             case '?':
                 break;
@@ -227,6 +236,16 @@ int main(int argc, char** argv)
     if (extract_fd == NULL) {
         printf("Failed to open extract data file for writing\n");
         exit(EXIT_FAILURE);
+    }
+
+    FILE* emulation_fd = NULL;
+    if (strlen(emulation_file) != 0) {
+        emulation_fd = fopen(emulation_file, "wb");
+
+        if (emulation_fd == NULL) {
+            printf("Failed to open emulation data file for writing\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
     int fd = open("/dev/mem", O_RDWR | O_SYNC);
@@ -288,6 +307,49 @@ int main(int argc, char** argv)
         printf("    Sectors:        TBD\n");
     else
         printf("    Sectors:        %d\n", drive_params.sectors);
+
+    struct drive_configuration drive_conf;
+    struct emulation_header emu_header;
+    uint8_t* emulation_sector = NULL;
+
+    if (emulation_fd != NULL) {
+        if (serial_get_drive_configuration(&drive_conf)) {
+            printf("Failed to query drive configuration data\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (drive_conf.general_configuration[0] & 0x4) {
+            printf("Creating emulation file for soft sectored disks not currently supported\n");
+            exit(EXIT_FAILURE);
+        }
+
+        emu_header.file_version = 1;
+        emu_header.drive_configuration_offset = sizeof(struct emulation_header);
+        emu_header.data_offset = EMULATION_DATA_OFFSET;
+        emu_header.cylinders = drive_params.cylinders;
+        emu_header.heads = drive_params.heads;
+        emu_header.sectors_per_track = drive_params.sectors;
+
+        uint16_t ubps = drive_conf.specific_configuration[5-1];
+        uint16_t bytes_needed = ubps + 1;
+
+
+        emu_header.sector_size_in_image = ((bytes_needed + EMULATION_FILE_ALIGNMENT - 1) / EMULATION_FILE_ALIGNMENT) * EMULATION_FILE_ALIGNMENT;
+
+        printf("Unformatted bytes per sector = %d (%d in emulation file)\n", ubps, emu_header.sector_size_in_image);
+
+        fwrite(&emu_header, sizeof(struct emulation_header), 1, emulation_fd);
+        fseek(emulation_fd, emu_header.drive_configuration_offset, SEEK_SET);
+        fwrite(&drive_conf, sizeof(struct drive_configuration), 1, emulation_fd);
+
+        emulation_sector = (uint8_t*) malloc(emu_header.sector_size_in_image);
+
+        if (emulation_sector == NULL) {
+            printf("Out of memory!\n");
+            exit(EXIT_FAILURE);
+        }
+
+    }
 
     struct esdi_controller* controller_params = controllers[controller];
 
@@ -455,6 +517,40 @@ int main(int argc, char** argv)
                             if (array_add_uniquely(processed_lbas, &num_processed_lbas, processed_sectors[i].lba)) {
                                 fseek(extract_fd, processed_sectors[i].lba * controller_params->sector_size, SEEK_SET);
                                 fwrite(processed_sectors[i].data, sizeof(uint8_t), processed_sectors[i].length, extract_fd);
+
+
+                                if (emulation_fd != NULL) {
+                                    fseek(
+                                        emulation_fd,
+                                        EMULATION_DATA_OFFSET + (((((j * drive_params.heads) + k) * drive_params.sectors) + physical_sectors[i]) * emu_header.sector_size_in_image),
+                                        SEEK_SET
+                                    );
+
+                                    memset(emulation_sector, 0, emu_header.sector_size_in_image);
+
+                                    emulation_sector[0] = physical_sectors[i];
+
+                                    // printf("Locations %d %d\n", raw_sectors[i].address_start_location, raw_sectors[i].data_start_location);
+
+                                    copy_buff_to_offset(
+                                        emulation_sector,
+                                        raw_sectors[i].address_area,
+                                        controller_params->addr_area_length,
+                                        (raw_sectors[i].address_start_location / 8) + 1,
+                                        raw_sectors[i].address_start_location % 8
+                                    );
+
+                                    copy_buff_to_offset(
+                                        emulation_sector,
+                                        raw_sectors[i].data_area,
+                                        controller_params->data_area_length,
+                                        (raw_sectors[i].data_start_location / 8) + 1,
+                                        raw_sectors[i].data_start_location % 8
+                                    );
+
+                                    fwrite(emulation_sector, sizeof(uint8_t), emu_header.sector_size_in_image, emulation_fd);
+                                }
+
                             }
 
                         }
@@ -485,6 +581,10 @@ int main(int argc, char** argv)
     }
     
     fclose(extract_fd);
+
+    if (emulation_fd != NULL) {
+        fclose(emulation_fd);
+    }
     
     for (int i = 0; i < allocated_sectors; i++) {
         free(raw_sectors[i].address_area);

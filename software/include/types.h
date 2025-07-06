@@ -39,6 +39,21 @@ struct drive_parameters {
 
 };
 
+struct __attribute__((packed)) drive_configuration {
+    uint16_t general_configuration[20];
+    uint16_t specific_configuration[15];
+};
+
+struct __attribute__((packed)) emulation_header {
+    uint16_t file_version;
+    uint32_t drive_configuration_offset;
+    uint32_t data_offset;
+    uint16_t cylinders;
+    uint16_t heads;
+    uint16_t sectors_per_track;
+    uint16_t sector_size_in_image;
+};
+
 struct raw_sector {
     // Address
     int cylinder;
@@ -50,9 +65,11 @@ struct raw_sector {
 
     bool address_read_ok;
     uint8_t* address_area;
+    int address_start_location;
 
     bool data_read_ok;
     uint8_t* data_area;
+    int data_start_location;
 };
 
 struct processed_sector {

@@ -33,5 +33,6 @@ int serial_command(uint16_t command);
 int serial_query_with_retries(uint16_t command, uint16_t* response);
 
 int serial_query_drive_parameters(struct drive_parameters* parameters);
+int serial_get_drive_configuration(struct drive_configuration* config);
 
 #endif // SERIAL_COMMAND_H

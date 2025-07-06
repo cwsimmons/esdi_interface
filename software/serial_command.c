@@ -126,3 +126,40 @@ int serial_query_drive_parameters(struct drive_parameters* parameters) {
 
     return 0;
 }
+
+int serial_get_drive_configuration(struct drive_configuration* config) {
+    uint16_t query_result;
+    if (serial_query_with_retries(CMD_REQCONF | CMD_REQCONF_MOD_GENERAL, &query_result)) return -1;
+
+    config->general_configuration[0] = query_result;
+
+    if (config->general_configuration[0] & 0x0001) {
+        uint8_t valid_subscripts[] = {1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+        for (int i = 0; i < 13; i++) {
+            if (
+                serial_query_with_retries(
+                    CMD_REQCONF | CMD_REQCONF_MOD_GENERAL | valid_subscripts[i],
+                    &query_result
+                )
+            ) return -1;
+
+            config->general_configuration[valid_subscripts[i]] = query_result;
+        }
+    }
+
+    uint8_t valid_specific[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15};
+    for (int i = 0; i < 11; i++) {
+        if (
+            serial_query_with_retries(
+                CMD_REQCONF | (((uint16_t) valid_specific[i]) << 8),
+                &query_result
+            )
+        ) return -1;
+
+        config->specific_configuration[valid_specific[i]-1] = query_result;
+    }
+
+
+
+    return 0;
+}

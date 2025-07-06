@@ -28,5 +28,6 @@ bool array_add_uniquely(int* array, int* array_length, int value);
 int array_find_value(int* array, int* array_length, int value);
 void array_remove_index(int* array, int* array_length, int index);
 void hex_print(uint8_t* buffer, int length);
+void copy_buff_to_offset(uint8_t* buffer_dest, volatile uint8_t* buffer_src, int length, int offset, int bit);
 
 #endif // UTIL_H

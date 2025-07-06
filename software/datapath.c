@@ -384,6 +384,9 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
                 raw_sectors[i].status = -4;
                 continue;
             }
+
+            raw_sectors[i].address_start_location = (dp_controller_info->addr_area_assert / 10) + (offset * 8) + bit;
+
             copy_buff_start_at(raw_sectors[i].address_area, &bram_base[(0x4000 + ((i*2) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->addr_area_length, offset, bit);
             raw_sectors[i].address_read_ok = true;
         } else {
@@ -412,6 +415,9 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
                 raw_sectors[i].status = -7;
                 continue;
             }
+
+            raw_sectors[i].data_start_location = (dp_controller_info->data_area_assert / 10) + (offset * 8) + bit;
+
             copy_buff_start_at(raw_sectors[i].data_area, &bram_base[(0x4000 + (((i*2) + 1) * 1024))], offset + (bit ? 1 : 0) + dp_controller_info->data_area_length, offset, bit);
             raw_sectors[i].data_read_ok = true;
         } else {
