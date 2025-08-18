@@ -18,6 +18,7 @@
 
 */
 
+#include "addresses.h"
 #include "datapath.h"
 #include "util.h"
 
@@ -277,7 +278,7 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
     volatile uint32_t* descriptors = (volatile uint32_t*) bram_base;
 
     // Set current descriptor to the first
-    dma_base[DMA_CURRDESC] = 0xa0040000;
+    dma_base[DMA_CURRDESC] = ADDR_BRAM;
 
     // Start DMA
     dma_set_enable(true);
@@ -300,14 +301,14 @@ bool read_track_sg(int num_sectors, int* physical_sectors, struct raw_sector* ra
             next_desc_offset = 0x00;
         }
 
-        descriptors[((i * 0x40) + 0x00) >> 2] = 0xa0040000 + next_desc_offset;        // Next Descriptor
-        descriptors[((i * 0x40) + 0x08) >> 2] = 0xa0040000 + 0x4000 + (i * 1024);     // Buffer Address
+        descriptors[((i * 0x40) + 0x00) >> 2] = ADDR_BRAM + next_desc_offset;        // Next Descriptor
+        descriptors[((i * 0x40) + 0x08) >> 2] = ADDR_BRAM + 0x4000 + (i * 1024);     // Buffer Address
         descriptors[((i * 0x40) + 0x18) >> 2] = 1024;                                 // Control (Just Length)
         descriptors[((i * 0x40) + 0x1C) >> 2] = 0;                                    // Status
     }
 
     // Set the tail descriptor to the last
-    dma_base[DMA_TAILDESC] = 0xa0040000 + (((num_sectors * 2) - 1) * 0x40);
+    dma_base[DMA_TAILDESC] = ADDR_BRAM + (((num_sectors * 2) - 1) * 0x40);
 
     usleep(10000);
 
@@ -449,7 +450,7 @@ int flush_fifo() {
     volatile uint32_t* descriptors = (volatile uint32_t*) bram_base;
 
     // Set current descriptor to the first
-    dma_base[DMA_CURRDESC] = 0xa0040000;
+    dma_base[DMA_CURRDESC] = ADDR_BRAM;
 
     // Start DMA
     dma_set_enable(true);
@@ -471,14 +472,14 @@ int flush_fifo() {
             next_desc_offset = 0x00;
         }
 
-        descriptors[((i * 0x40) + 0x00) >> 2] = 0xa0040000 + next_desc_offset;        // Next Descriptor
-        descriptors[((i * 0x40) + 0x08) >> 2] = 0xa0040000 + 0x4000 + (i * 1024);     // Buffer Address
+        descriptors[((i * 0x40) + 0x00) >> 2] = ADDR_BRAM + next_desc_offset;        // Next Descriptor
+        descriptors[((i * 0x40) + 0x08) >> 2] = ADDR_BRAM + 0x4000 + (i * 1024);     // Buffer Address
         descriptors[((i * 0x40) + 0x18) >> 2] = 1024;                                 // Control (Just Length)
         descriptors[((i * 0x40) + 0x1C) >> 2] = 0;                                    // Status
     }
 
     // Set the tail descriptor to the last
-    dma_base[DMA_TAILDESC] = 0xa0040000 + (127 * 0x40);
+    dma_base[DMA_TAILDESC] = ADDR_BRAM + (127 * 0x40);
 
     usleep(1000);
 

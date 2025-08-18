@@ -30,6 +30,7 @@
 #include <sys/mman.h>
 #include <signal.h>
 
+#include "addresses.h"
 #include "crc.h"
 #include "types.h"
 #include "serial_command.h"
@@ -254,17 +255,17 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
 
-    volatile uint32_t* mem_base = (uint32_t*) mmap(NULL, 0x80000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0xa0000000);
+    volatile uint32_t* mem_base = (uint32_t*) mmap(NULL, PL_BRIDGE_LENGTH, PROT_READ|PROT_WRITE, MAP_SHARED, fd, PL_BRIDGE_ADDR);
     if (mem_base == MAP_FAILED) {
         printf("Failed to mmap\n");
         exit(EXIT_FAILURE);
     }
 
-    serial_command_base = mem_base;
-    sector_timer_base = &mem_base[(0x1000 >> 2)];
-    datapath_base = &mem_base[0x2000 >> 2];
-    bram_base = (uint8_t*) &mem_base[0x40000 >> 2];
-    dma_base = &mem_base[0x10000 >> 2];
+    serial_command_base =  &mem_base[(PL_BRIDGE_ADDR - ADDR_CMD) >> 2];
+    sector_timer_base =    &mem_base[(PL_BRIDGE_ADDR - ADDR_TIMER) >> 2];
+    datapath_base =        &mem_base[(PL_BRIDGE_ADDR - ADDR_READ) >> 2];
+    bram_base = (uint8_t*) &mem_base[(PL_BRIDGE_ADDR - ADDR_BRAM) >> 2];
+    dma_base =             &mem_base[(PL_BRIDGE_ADDR - ADDR_DMA) >> 2];
 
     atexit(shutdown);
 
