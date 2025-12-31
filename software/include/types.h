@@ -83,4 +83,10 @@ struct processed_sector {
     uint8_t* data;
 };
 
+enum SectorStatus {
+    UNREAD,
+    READ_OK,
+    READ_WITH_ERRORS
+};
+
 #endif // TYPES_H

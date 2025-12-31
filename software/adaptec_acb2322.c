@@ -28,7 +28,7 @@
 
 struct esdi_controller adaptec_acb2322 = {
     "ADAPTEC_ACB2322",
-    4, 1972, 2270, 2270+42936,
+    408+900, 408+900+1872, 3300, 2540+43400,
     0xFE, 0xFE,
     8, 519, 512,
     adaptec_acb2322_get_expected_lbas,
@@ -84,6 +84,13 @@ int adaptec_acb2322_process_sector(
         .h = raw->address_area[3],
         .s = raw->address_area[4]
     };
+
+    if (raw->address_area[5] & 0x80) {
+        processed->marked_bad = true;
+        return 0;
+    } else {
+        processed->marked_bad = false;
+    }
 
     uint32_t data_check = crc48_msb(
         raw->data_area,

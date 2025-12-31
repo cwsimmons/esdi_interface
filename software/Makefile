@@ -15,11 +15,22 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
-CC=aarch64-none-linux-gnu-gcc
+
 # CC=gcc
 CFLAGS=-g
 
-DEVICE=MPSOC
+HARDWARE ?=MPSOC
+
+ifeq ($(HARDWARE),MPSOC)
+CFLAGS += -D$(HARDWARE)
+CC = aarch64-none-linux-gnu-gcc
+else ifeq ($(HARDWARE),ZYNQ7)
+CFLAGS += -D$(HARDWARE)
+CC = arm-none-linux-gnueabihf-gcc
+else ifeq ($(HARDWARE),NONE)
+CFLAGS += -DNO_HARDWARE
+endif
+
 
 INCDIR=include
 OBJDIR=obj
@@ -31,14 +42,9 @@ DEPS = $(patsubst %,$(INCDIR)/%,$(_DEPS))
 OBJ = $(patsubst %,$(OBJDIR)/%,$(_OBJ))
 
 $(OBJDIR)/%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $(CFLAGS) $< -I $(INCDIR) -D$(DEVICE)
+	$(CC) -c -o $@ $(CFLAGS) $< -I $(INCDIR)
 
 esdi_read: $(OBJ)
-	$(CC) -o $@ $^
-
-esdi_read_zynq7: CC=arm-none-linux-gnueabihf-gcc
-esdi_read_zynq7: DEVICE=ZYNQ7
-esdi_read_zynq7: $(OBJ)
 	$(CC) -o $@ $^
 
 .PHONY: clean

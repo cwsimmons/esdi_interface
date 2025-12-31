@@ -63,11 +63,12 @@ void ctrlc(int arg) {
 
 bool all_sectors_accounted_for(
     int num_sectors,
-    bool* physical_sector_statuses,
+    enum SectorStatus* physical_sector_statuses,
     int* expected_lbas,
     int num_expected_lbas,
     int* processed_lbas,
-    int num_processed_lbas
+    int num_processed_lbas,
+    bool creating_emulation_file
 ) {
 
     // Return true if either all sectors decoded without
@@ -76,7 +77,7 @@ bool all_sectors_accounted_for(
     bool all_sectors_decoded_ok = true;
 
     for (int i = 0; i < num_sectors; i++) {
-        if (physical_sector_statuses[i] == false) {
+        if (physical_sector_statuses[i] != READ_OK) {
             all_sectors_decoded_ok = false;
             break;
         }
@@ -84,6 +85,9 @@ bool all_sectors_accounted_for(
 
     if (all_sectors_decoded_ok)
         return true;
+
+    if (creating_emulation_file)
+        return all_sectors_decoded_ok;
 
     bool all_expected_are_processed = true;
     for (int i = 0; i < num_expected_lbas; i++) {
@@ -112,10 +116,15 @@ int main(int argc, char** argv)
     int controller = -1;
     int starting_cylinder = 0;
     int max_attempts = 5;
+    struct drive_parameters drive_params;
+    struct drive_configuration drive_conf;
+    struct emulation_header emu_header;
+    uint8_t* input_sector = NULL;
 
     char extract_data_filename[FILENAME_MAX] = "";
     char data_crc_analysis_prefix[FILENAME_MAX] = "";
     char emulation_file[FILENAME_MAX] = "";
+    char input_file[FILENAME_MAX] = "";
 
     char* sector_mode_options[2] = {"hard", "soft"};
     
@@ -131,7 +140,8 @@ int main(int argc, char** argv)
         {"start-cyl",       required_argument, 0, 'S'},
         {"max-attempts",    required_argument, 0, 'r'},
         {"data-crc-analysis", required_argument, 0, 1},
-        {"emulation-file",  required_argument, 0,   2},
+        {"emulation-file",  required_argument, 0,  2},
+        {"emulation-input", required_argument, 0, 'i'},
         {0,                 0,                 0,  0 }
     };
 
@@ -146,7 +156,7 @@ int main(int argc, char** argv)
 
     signal(SIGINT, ctrlc);
 
-    while ((c = getopt_long(argc, argv, "d:m:c:h:s:e:C:S:r:", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "d:m:c:h:s:e:C:S:r:i:", long_options, &option_index)) != -1) {
 
         switch (c) {
             case 0:
@@ -202,6 +212,10 @@ int main(int argc, char** argv)
             case 2:
                 strcpy(emulation_file, optarg);
                 break;
+
+            case 'i':
+                strcpy(input_file, optarg);
+                break;
                 
             case '?':
                 break;
@@ -209,11 +223,6 @@ int main(int argc, char** argv)
             default:
                 break;
         }
-    }
-
-    if (drive_select == -1) {
-        printf("Please specify the drive select number (-d)\n");
-        exit(EXIT_FAILURE);
     }
 
     if (controller == -1) {
@@ -249,37 +258,104 @@ int main(int argc, char** argv)
         }
     }
 
-    int fd = open("/dev/mem", O_RDWR | O_SYNC);
-    if (fd == -1) {
-        printf("Failed to open /dev/mem\n");
-        exit(EXIT_FAILURE);
+    FILE* input_fd = NULL;
+    if (strlen(input_file) != 0) {
+        input_fd = fopen(input_file, "rb");
+
+        if (input_fd == NULL) {
+            printf("Failed to open input emulation data file for reading\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    volatile uint32_t* mem_base = (uint32_t*) mmap(NULL, PL_BRIDGE_LENGTH, PROT_READ|PROT_WRITE, MAP_SHARED, fd, PL_BRIDGE_ADDR);
-    if (mem_base == MAP_FAILED) {
-        printf("Failed to mmap\n");
-        exit(EXIT_FAILURE);
+    if (input_fd == NULL) {
+
+        if (drive_select == -1) {
+            printf("Please specify the drive select number (-d)\n");
+            exit(EXIT_FAILURE);
+        }
+
+        int fd = open("/dev/mem", O_RDWR | O_SYNC);
+        if (fd == -1) {
+            printf("Failed to open /dev/mem\n");
+            exit(EXIT_FAILURE);
+        }
+
+        volatile uint32_t* mem_base = (uint32_t*) mmap(NULL, PL_BRIDGE_LENGTH, PROT_READ|PROT_WRITE, MAP_SHARED, fd, PL_BRIDGE_ADDR);
+        if (mem_base == MAP_FAILED) {
+            printf("Failed to mmap\n");
+            exit(EXIT_FAILURE);
+        }
+
+        serial_command_base =  &mem_base[(ADDR_CMD - PL_BRIDGE_ADDR) >> 2];
+        sector_timer_base =    &mem_base[(ADDR_TIMER - PL_BRIDGE_ADDR) >> 2];
+        datapath_base =        &mem_base[(ADDR_READ - PL_BRIDGE_ADDR) >> 2];
+        bram_base = (uint8_t*) &mem_base[(ADDR_BRAM - PL_BRIDGE_ADDR) >> 2];
+        dma_base =             &mem_base[(ADDR_DMA - PL_BRIDGE_ADDR) >> 2];
+
+        atexit(shutdown);
+
+
+        set_drive_select(drive_select);
+
+        usleep(1000);
+
+        if (serial_command_base[4] & 0x8) {
+            printf("Drive selected not asserted\n");
+        } else {
+            printf("Drive selected\n");
+        }
+
+        if (serial_command_base[4] & 0x1) {
+            printf("Ready not asserted\n");
+        } else {
+            printf("Drive ready\n");
+        }
+
+        if (!(serial_command_base[4] & 0x2)) {
+            printf("Attention is asserted\n");
+        }
+
+
+        uint16_t general_status;
+        serial_query(CMD_REQSTAT, &general_status);
+        printf("status = 0x%x\n", general_status);
+
+        printf("resetting\n");
+        drive_reset();
+
+        serial_query(CMD_REQSTAT, &general_status);
+        printf("status = 0x%x\n", general_status);
+
+
+        // printf("head test\n");
+        // set_head_select(15);
+        // usleep(1000);
+        // set_head_select(0);
+
+        // serial_query(CMD_REQSTAT, &general_status);
+        // printf("status = 0x%x\n", general_status);
+
+
+
+        if (serial_query_drive_parameters(&drive_params)) {
+            printf("Failed to query drive parameters\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+
+        // Read drive_params from file
+        size_t num_read = fread(&emu_header, sizeof(struct emulation_header), 1, input_fd);
+        fseek(input_fd, emu_header.drive_configuration_offset, SEEK_SET);
+        num_read = fread(&drive_conf, sizeof(struct drive_configuration), 1, input_fd);
+
+        drive_params.is_soft_sectored = drive_conf.general_configuration[0] & 0x0001;
+        drive_params.heads = drive_conf.specific_configuration[(CMD_REQCONF_MOD_NUMHEADS >> 8) - 1] & 0x00FF;
+        drive_params.cylinders = drive_conf.specific_configuration[(CMD_REQCONF_MOD_NUMCYLFIXED >> 8) - 1];
+        drive_params.sectors_hard = drive_conf.specific_configuration[(CMD_REQCONF_MOD_SECPERTRK >> 8) - 1] & 0x00FF;
+
+        input_sector = (uint8_t*) malloc(emu_header.sector_size_in_image);
     }
-
-    serial_command_base =  &mem_base[(PL_BRIDGE_ADDR - ADDR_CMD) >> 2];
-    sector_timer_base =    &mem_base[(PL_BRIDGE_ADDR - ADDR_TIMER) >> 2];
-    datapath_base =        &mem_base[(PL_BRIDGE_ADDR - ADDR_READ) >> 2];
-    bram_base = (uint8_t*) &mem_base[(PL_BRIDGE_ADDR - ADDR_BRAM) >> 2];
-    dma_base =             &mem_base[(PL_BRIDGE_ADDR - ADDR_DMA) >> 2];
-
-    atexit(shutdown);
-
-
-    set_drive_select(drive_select);
-    drive_reset();
-
-
-    struct drive_parameters drive_params;
-    if (serial_query_drive_parameters(&drive_params)) {
-        printf("Failed to query drive parameters\n");
-        exit(EXIT_FAILURE);
-    }
-
 
     if (sector_mode != -1)
         drive_params.is_soft_sectored = (sector_mode == 1) ? true : false;
@@ -297,7 +373,7 @@ int main(int argc, char** argv)
         drive_params.sectors = sectors;
     }
 
-    if (max_attempts < 1)
+    if (max_attempts < 1 || input_fd != NULL)
         max_attempts = 1;
 
     printf("Drive Parameters:\n");
@@ -309,8 +385,7 @@ int main(int argc, char** argv)
     else
         printf("    Sectors:        %d\n", drive_params.sectors);
 
-    struct drive_configuration drive_conf;
-    struct emulation_header emu_header;
+
     uint8_t* emulation_sector = NULL;
 
     if (emulation_fd != NULL) {
@@ -358,7 +433,7 @@ int main(int argc, char** argv)
 
     int physical_sectors[128];
     int expected_lbas[128];
-    bool physical_sector_statuses[128];
+    enum SectorStatus physical_sector_statuses[128];
     int processed_lbas[128];
 
     int num_processed_lbas;
@@ -387,38 +462,44 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
 
-    datapath_sector_timer_reset();
-    datapath_sector_timer_set_enable(true);
-    usleep(100000);
-    printf("nummber of sector seen by interface = %d\n", sector_timer_base[7]);
-    datapath_sector_timer_set_enable(false);
-
     // I thought there might be time when we don't want to read all
     // of the sectors on the track. Could probably be removed.
     for (int i = 0; i < drive_params.sectors; i++) {
         physical_sectors[i] = i;
     }
 
-    datapath_configure(&drive_params, controller_params);
-    datapath_start();
+    if (input_fd == NULL) {
+        datapath_sector_timer_reset();
+        datapath_sector_timer_set_enable(true);
+        usleep(100000);
+        printf("nummber of sector seen by interface = %d\n", sector_timer_base[7]);
+        datapath_sector_timer_set_enable(false);
 
-    flush_fifo();
-    reset_dma();
+        datapath_configure(&drive_params, controller_params);
+        datapath_start();
+
+        flush_fifo();
+        reset_dma();
+    }
 
     for (int j = starting_cylinder; (j < drive_params.cylinders) && !stop; j++) {
 
-        drive_seek(j);
-        usleep(100000);
+        if (input_fd == NULL) {
+            drive_seek(j);
+            usleep(100000);
+        }
 
         printf("At cyl %d\n", j);
 
         for (int k = 0; (k < drive_params.heads) && !stop; k++) {
 
-            set_head_select(k);
-            usleep(10000);
+            if (input_fd == NULL) {
+                set_head_select(k);
+                usleep(10000);
+            }
 
             for (int i = 0; i < drive_params.sectors; i++) {
-                physical_sector_statuses[i] = false;
+                physical_sector_statuses[i] = UNREAD;
             }
 
             // Get the LBAs that we expect on this track
@@ -441,7 +522,8 @@ int main(int argc, char** argv)
                     expected_lbas,
                     num_expected_lbas,
                     processed_lbas,
-                    num_processed_lbas
+                    num_processed_lbas,
+                    emulation_fd != NULL
                 ) &&
                 !stop
             ) {
@@ -454,7 +536,7 @@ int main(int argc, char** argv)
                     );
                 }
 
-                if (reset_recommended) {
+                if (reset_recommended && input_fd == NULL) {
                     printf("Resetting datapath\n");
                     reset_dma();
                     flush_fifo();
@@ -463,7 +545,69 @@ int main(int argc, char** argv)
                 }
 
                 // Read all sectors on the track
-                reset_recommended = read_track_sg(drive_params.sectors, physical_sectors, raw_sectors);
+                if (input_fd == NULL) {
+                    reset_recommended = read_track_sg(drive_params.sectors, physical_sectors, raw_sectors);
+                } else {
+
+                    
+
+                    // read_track_from_emulation_file(j, k, drive_params.sectors, physical_sectors, raw_sectors);
+                    for (int i = 0; i < drive_params.sectors; i++) {
+                        raw_sectors[i].status = -1;
+                        raw_sectors[i].address_read_ok = false;
+                        raw_sectors[i].data_read_ok = false;
+                        fseek(
+                            input_fd,
+                            emu_header.data_offset + (((((j * emu_header.heads) + k) * emu_header.sectors_per_track) + physical_sectors[i]) * emu_header.sector_size_in_image),
+                            SEEK_SET
+                        );
+                        fread(input_sector, sizeof(uint8_t), emu_header.sector_size_in_image, input_fd);
+
+                        if (input_sector[0] != physical_sectors[i]) {
+                            printf("Sector missplaced! (found 0x%.2x, should be 0x%.2x)\n", input_sector[0], physical_sectors[i]);
+                        }
+                        int offset, bit;
+                        int address_area_start = controller_params->addr_area_assert / 10 / 8 + 1;
+                        int address_area_end = controller_params->addr_area_deassert / 10 / 8 + 2;
+                        if (!findbyte(&input_sector[address_area_start], address_area_end - address_area_start, controller_params->addr_area_sync_byte, &offset, &bit)) {
+                            // Can't find sync byte
+                            raw_sectors[i].status = -3;
+                            // hex_print(&input_sector[1], emu_header.sector_size_in_image - 1);
+                            continue;
+                        }
+                        if ((offset + (bit ? 1 : 0) + controller_params->addr_area_length) > address_area_end - address_area_start) {
+                            // Not enough data after the sync byte
+                            raw_sectors[i].status = -4;
+                            continue;
+                        }
+
+                        raw_sectors[i].address_start_location = (controller_params->addr_area_assert / 10) + (offset * 8) + bit;
+
+                        copy_buff_start_at(raw_sectors[i].address_area, &input_sector[address_area_start], offset + (bit ? 1 : 0) + controller_params->addr_area_length, offset, bit);
+                        // hex_print(raw_sectors[i].address_area, dp_controller_info->addr_area_length);
+                        raw_sectors[i].address_read_ok = true;
+
+                        int data_area_start = controller_params->data_area_assert / 10 / 8 + 1;
+                        int data_area_end = controller_params->data_area_deassert / 10 / 8 + 2;
+                        if (!findbyte(&input_sector[data_area_start], data_area_end - data_area_start, controller_params->data_area_sync_byte, &offset, &bit)) {
+                            // Can't find sync byte
+                            raw_sectors[i].status = -6;
+                            continue;
+                        }
+                        if ((offset + (bit ? 1 : 0) + controller_params->data_area_length) > data_area_end - data_area_start) {
+                            // Not enough data after the sync byte
+                            raw_sectors[i].status = -7;
+                            continue;
+                        }
+
+                        raw_sectors[i].data_start_location = (controller_params->data_area_assert / 10) + (offset * 8) + bit;
+
+                        copy_buff_start_at(raw_sectors[i].data_area, &input_sector[data_area_start], offset + (bit ? 1 : 0) + controller_params->data_area_length, offset, bit);
+                        // hex_print(raw_sectors[i].address_area, dp_controller_info->addr_area_length);
+                        raw_sectors[i].data_read_ok = true;
+
+                    }
+                }
 
                 // Process the sectors
                 for (int i = 0; i < drive_params.sectors; i++) {
@@ -502,63 +646,65 @@ int main(int argc, char** argv)
                         &processed_sectors[i]
                     );
 
-                    // Successful read
-                    if (!decode_status) {
+                    if (decode_status) {
+                        printf("Decode error on [%d,%d,%d] = %d\n", j, k, physical_sectors[i], decode_status);
+                    }
+
+                    // Determine if the data should be saved from this pass
+                    if (((physical_sector_statuses[i] != READ_OK) && (decode_status == 0)) || (physical_sector_statuses[i] == UNREAD)) {
                         
-                        physical_sector_statuses[i] = true;
+                        if (decode_status == 0) {
+                            physical_sector_statuses[i] = READ_OK;
+                        } else {
+                            physical_sector_statuses[i] = READ_WITH_ERRORS;
+                        }
 
-                        if (processed_sectors[i].marked_bad) {
-
-                            if (processed_sectors[i].relocated) {
-                                //array_add_uniquely(relocated_lbas, num_relocated_sectors);
-                            }
-
-                        } else if (!processed_sectors[i].marked_spare) {
+                        if ((decode_status == 0) && !processed_sectors[i].marked_bad && !processed_sectors[i].marked_spare) {
 
                             if (array_add_uniquely(processed_lbas, &num_processed_lbas, processed_sectors[i].lba)) {
                                 fseek(extract_fd, processed_sectors[i].lba * controller_params->sector_size, SEEK_SET);
                                 fwrite(processed_sectors[i].data, sizeof(uint8_t), processed_sectors[i].length, extract_fd);
-
-
-                                if (emulation_fd != NULL) {
-                                    fseek(
-                                        emulation_fd,
-                                        EMULATION_DATA_OFFSET + (((((j * drive_params.heads) + k) * drive_params.sectors) + physical_sectors[i]) * emu_header.sector_size_in_image),
-                                        SEEK_SET
-                                    );
-
-                                    memset(emulation_sector, 0, emu_header.sector_size_in_image);
-
-                                    emulation_sector[0] = physical_sectors[i];
-
-                                    // printf("Locations %d %d\n", raw_sectors[i].address_start_location, raw_sectors[i].data_start_location);
-
-                                    copy_buff_to_offset(
-                                        emulation_sector,
-                                        raw_sectors[i].address_area,
-                                        controller_params->addr_area_length,
-                                        (raw_sectors[i].address_start_location / 8) + 1,
-                                        raw_sectors[i].address_start_location % 8
-                                    );
-
-                                    copy_buff_to_offset(
-                                        emulation_sector,
-                                        raw_sectors[i].data_area,
-                                        controller_params->data_area_length,
-                                        (raw_sectors[i].data_start_location / 8) + 1,
-                                        raw_sectors[i].data_start_location % 8
-                                    );
-
-                                    fwrite(emulation_sector, sizeof(uint8_t), emu_header.sector_size_in_image, emulation_fd);
-                                }
-
                             }
 
                         }
 
-                    } else {
-                        printf("Decode error on [%d,%d,%d] = %d\n", j, k, physical_sectors[i], decode_status);
+                        if (emulation_fd != NULL) {
+                            fseek(
+                                emulation_fd,
+                                EMULATION_DATA_OFFSET + (((((j * drive_params.heads) + k) * drive_params.sectors) + physical_sectors[i]) * emu_header.sector_size_in_image),
+                                SEEK_SET
+                            );
+
+                            memset(emulation_sector, 0, emu_header.sector_size_in_image);
+
+                            emulation_sector[0] = physical_sectors[i];
+
+                            copy_buff_to_offset(
+                                emulation_sector,
+                                raw_sectors[i].address_area,
+                                controller_params->addr_area_length,
+                                (raw_sectors[i].address_start_location / 8) + 1,
+                                0 //raw_sectors[i].address_start_location % 8
+                            );
+
+                            if (raw_sectors[i].data_read_ok) {
+                                copy_buff_to_offset(
+                                    emulation_sector,
+                                    raw_sectors[i].data_area,
+                                    controller_params->data_area_length,
+                                    (raw_sectors[i].data_start_location / 8) + 1,
+                                    0 //raw_sectors[i].data_start_location % 8
+                                );
+                            } else {
+                                printf("[%d,%d,%d] Skipping data\n", j, k, physical_sectors[i]);
+                            }
+
+                            fwrite(emulation_sector, sizeof(uint8_t), emu_header.sector_size_in_image, emulation_fd);
+                        }
+
                     }
+
+                    
                 }
                 attempt++;
             }
@@ -585,6 +731,10 @@ int main(int argc, char** argv)
 
     if (emulation_fd != NULL) {
         fclose(emulation_fd);
+    }
+
+    if (input_fd != NULL) {
+        fclose(input_fd);
     }
     
     for (int i = 0; i < allocated_sectors; i++) {
